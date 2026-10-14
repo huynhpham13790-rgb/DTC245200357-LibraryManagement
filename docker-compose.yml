@@ -1,0 +1,165 @@
+services:
+  # 1. Database
+  postgres:
+    image: postgres:16-alpine
+    container_name: lib_postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${DB_USER:-libadmin}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-SecurePassDB_2026!}
+      POSTGRES_DB: ${DB_NAME:-library_system}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    networks:
+      - backend_net
+
+  # 2. pgAdmin
+  pgadmin:
+    image: dpage/pgadmin4:latest
+    container_name: lib_pgadmin
+    user: root
+    restart: unless-stopped
+    environment:
+      PGADMIN_DEFAULT_EMAIL: ${PGADMIN_EMAIL:-admin@library.com}
+      PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_PASSWORD:-SuperAdminPass2026!}
+      PGADMIN_CONFIG_SERVER_MODE: 'False'
+      PGADMIN_DISABLE_POSTFIX: 'True'
+    networks:
+      - frontend_net
+      - backend_net
+    depends_on:
+      - postgres
+
+  # 3. Web Application
+  app:
+    build: ./app
+    container_name: lib_app
+    restart: unless-stopped
+    environment:
+      DB_HOST: postgres
+      DB_USER: ${DB_USER:-libadmin}
+      DB_PASSWORD: ${DB_PASSWORD:-SecurePassDB_2026!}
+      DB_NAME: ${DB_NAME:-library_system}
+    networks:
+      - frontend_net
+      - backend_net
+      - monitoring_net
+    depends_on:
+      - postgres
+
+  # 4. Nginx Reverse Proxy
+  nginx:
+    image: nginx:alpine
+    container_name: lib_nginx
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./nginx/ssl:/etc/nginx/ssl:ro
+      - ./logs/nginx:/var/log/nginx
+    networks:
+      - frontend_net
+      - monitoring_net
+    depends_on:
+      - app
+      - pgadmin
+
+  # 5. Monitoring - Prometheus
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: lib_prometheus
+    restart: unless-stopped
+    volumes:
+      - ./monitoring/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+    networks:
+      - monitoring_net
+
+  # 6. Monitoring - Exporters
+  cadvisor:
+    image: gcr.io/cadvisor/cadvisor:latest
+    container_name: lib_cadvisor
+    restart: unless-stopped
+    volumes:
+      - /:/rootfs:ro
+      - /var/run:/var/run:ro
+      - /sys:/sys:ro
+      - /var/lib/docker/:/var/lib/docker:ro
+    networks:
+      - monitoring_net
+
+  postgres-exporter:
+    image: prometheuscommunity/postgres-exporter:latest
+    container_name: lib_postgres_exporter
+    restart: unless-stopped
+    environment:
+      DATA_SOURCE_NAME: "postgresql://${DB_USER:-libadmin}:${DB_PASSWORD:-SecurePassDB_2026!}@postgres:5432/${DB_NAME:-library_system}?sslmode=disable"
+    networks:
+      - backend_net
+      - monitoring_net
+    depends_on:
+      - postgres
+
+  nginx-exporter:
+    image: nginx/nginx-prometheus-exporter:latest
+    container_name: lib_nginx_exporter
+    restart: unless-stopped
+    command: -nginx.scrape-uri=http://nginx:80/stub_status
+    networks:
+      - monitoring_net
+    depends_on:
+      - nginx
+
+  # 7. Visualization - Grafana
+  grafana:
+    image: grafana/grafana:latest
+    container_name: lib_grafana
+    restart: unless-stopped
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_PASSWORD:-GrafanaStrongPass2026!}
+      - GF_SERVER_ROOT_URL=%(protocol)s://%(domain)s:%(http_port)s/grafana/
+      - GF_SERVER_SERVE_FROM_SUB_PATH=true
+    volumes:
+      - grafanadata:/var/lib/grafana
+    networks:
+      - frontend_net
+      - monitoring_net
+
+  # 8. Logging - Loki & Promtail
+  loki:
+    image: grafana/loki:latest
+    container_name: lib_loki
+    restart: unless-stopped
+    command: -config.file=/etc/loki/local-config.yaml
+    volumes:
+      - lokidata:/loki
+    networks:
+      - monitoring_net
+
+  promtail:
+    image: grafana/promtail:latest
+    container_name: lib_promtail
+    restart: unless-stopped
+    volumes:
+      - ./monitoring/promtail/promtail-config.yml:/etc/promtail/config.yml:ro
+      - ./logs/nginx:/var/log/nginx:ro
+      - /var/log:/var/log:ro
+    command: -config.file=/etc/promtail/config.yml
+    networks:
+      - monitoring_net
+    depends_on:
+      - loki
+
+networks:
+  frontend_net:
+    driver: bridge
+  backend_net:
+    driver: bridge
+  monitoring_net:
+    driver: bridge
+
+volumes:
+  pgdata:
+  grafanadata:
+  lokidata:
