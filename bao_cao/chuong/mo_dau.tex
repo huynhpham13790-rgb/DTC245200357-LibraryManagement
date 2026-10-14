@@ -1,0 +1,43 @@
+\documentclass[../main.tex]{subfiles}
+
+\begin{document}
+
+\section*{Lý do chọn đề tài}
+Thư viện là đơn vị không thể thiếu trong các trường đại học. Việc quản lý thủ công bằng sổ sách hoặc bảng tính khiến công tác tra cứu sách, theo dõi độc giả, lập phiếu mượn -- trả và nhắc nhở sách quá hạn tốn nhiều thời gian và dễ sai sót. Một phần mềm quản lý thư viện chạy trên nền web giúp tự động hóa các nghiệp vụ này.
+
+Tuy nhiên, để một phần mềm vận hành ổn định trong thực tế, ngoài việc lập trình chức năng, người quản trị còn phải giải quyết bài toán \textit{triển khai và vận hành}: đóng gói ứng dụng, kết nối cơ sở dữ liệu, công bố dịch vụ an toàn qua HTTPS, giám sát tài nguyên, thu thập log tập trung để truy vết sự cố và thắt chặt bảo mật. Đây chính là nội dung trọng tâm của học phần Triển khai và Quản trị Hệ thống Phần mềm. Vì vậy em lựa chọn \textbf{Đề tài 01 -- Hệ thống Quản lý Thư viện} để vừa xây dựng ứng dụng, vừa thực hành đầy đủ quy trình triển khai, giám sát và bảo mật hệ thống.
+
+\section*{Mục tiêu}
+\begin{itemize}
+    \item Xây dựng ứng dụng web quản lý thư viện gồm: quản lý kho sách, quản lý độc giả, mượn -- trả -- gia hạn sách, theo dõi sách quá hạn, thống kê và phân quyền tài khoản thủ thư.
+    \item Triển khai toàn bộ hệ thống bằng Docker Compose với PostgreSQL và công cụ quản trị pgAdmin.
+    \item Cấu hình Nginx làm reverse proxy có HTTPS tự ký và các HTTP security header.
+    \item Tích hợp Prometheus, Grafana cùng các exporter để giám sát container, web server và cơ sở dữ liệu.
+    \item Triển khai hệ thống log tập trung Loki + Promtail và truy vấn bằng LogQL.
+    \item Áp dụng các biện pháp hardening: non-root container, cô lập mạng, mật khẩu mạnh, hạn chế quyền, giới hạn tần suất truy cập.
+    \item Quản lý mã nguồn trên GitHub với các commit rõ ràng và README hướng dẫn chạy.
+\end{itemize}
+
+\section*{Đối tượng và phạm vi}
+\textbf{Đối tượng:} các công nghệ container hóa (Docker, Docker Compose), reverse proxy (Nginx), giám sát (Prometheus, Grafana, cAdvisor, Postgres Exporter, Nginx Exporter), log tập trung (Loki, Promtail) và nghiệp vụ quản lý thư viện.
+
+\textbf{Phạm vi:} hệ thống được triển khai trên một máy chủ Linux (Ubuntu) dùng Docker Engine; người dùng ứng dụng là cán bộ thủ thư; chứng chỉ SSL là chứng chỉ tự ký phục vụ môi trường học tập.
+
+\section*{Phương pháp thực hiện}
+\begin{itemize}
+    \item Nghiên cứu tài liệu chính thức của các công nghệ sử dụng.
+    \item Phân tích yêu cầu của đề bài và nghiệp vụ thư viện, thiết kế kiến trúc, cơ sở dữ liệu và API.
+    \item Triển khai theo từng giai đoạn, mỗi giai đoạn tương ứng một commit trên GitHub.
+    \item Kiểm thử chức năng, kiểm tra cấu hình bảo mật và thu thập minh chứng bằng ảnh chụp màn hình.
+\end{itemize}
+
+\section*{Cấu trúc báo cáo}
+Ngoài phần mở đầu và kết luận, báo cáo gồm 4 chương:
+\begin{itemize}
+    \item \textbf{Chương 1 -- Cơ sở lý thuyết:} trình bày các công nghệ được sử dụng.
+    \item \textbf{Chương 2 -- Khảo sát và phân tích hệ thống:} phân tích yêu cầu đề bài, nghiệp vụ thư viện, yêu cầu chức năng và phi chức năng.
+    \item \textbf{Chương 3 -- Thiết kế hệ thống:} kiến trúc tổng thể, thiết kế mạng, cơ sở dữ liệu, API, giám sát, log và bảo mật.
+    \item \textbf{Chương 4 -- Triển khai và kết quả:} quá trình cài đặt, kết quả chạy thực tế, minh chứng và đánh giá theo tiêu chí của đề bài.
+\end{itemize}
+
+\end{document}

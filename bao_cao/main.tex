@@ -1,0 +1,297 @@
+\pdfminorversion=7
+
+% Mẫu luận văn ĐHCT soạn thảo bằng LaTeX, phiên bản 1.0
+% ====================================================================
+
+% twoside, openright: 2 mặt, trang đầu chương luôn nằm bên tay phải
+% \documentclass[a4paper,12pt,twoside,openright]{report}	
+
+% oneside: 1 mặt
+\documentclass[a4paper,12pt,oneside,onehalfspacing]{report}
+
+% Tiếng Việt
+\usepackage[utf8]{vietnam}
+
+\usepackage{mathptmx}	% same Time New Roman
+\usepackage[fontsize=13pt]{fontsize}
+
+% Dùng để set margin
+% \usepackage[top=3cm,inner=3.5cm,outer=2cm,bottom=3cm,headheight=120pt]{geometry}		
+% \usepackage[top=2.5cm,bottom=2.5cm,left=3cm, right=2cm, headheight=2pt]{geometry}	
+\usepackage[top=2cm,bottom=2cm,left=3cm, right=2cm, headheight=15pt]{geometry}	
+
+
+\usepackage{tikz}
+\usetikzlibrary{positioning,arrows.meta,fit,backgrounds,shapes.multipart}
+\usetikzlibrary{calc}
+
+\usepackage{graphicx}			% Dùng để chèn hình ảnh
+\graphicspath{{tai_nguyen/}}		% Folder chứa tài nguyên dùng chung
+\usepackage{subfiles}			% Dùng để chia thành các files nhỏ
+\usepackage{fancyhdr}			% Dùng để tạo header và footer
+\usepackage{emptypage}			% Không đánh số trang, header, footer với các trang trắng
+\usepackage{tabularx}			% Dùng để chèn bảng
+\usepackage{pdflscape}			% Một vài trang nằm ngang (landscape) thay vì dọc (portrait) (bảng, biểu đồ)
+% \usepackage{natbib}							% Dùng cho tài liệu tham khảo
+% \setcitestyle{super}								% Ký hiệu tài liệu tham khảo dạng superscript
+\usepackage{url}									% Dùng cho URL
+\usepackage{longtable}								% Dùng cho các bảng dài, nhiều trang
+\usepackage{amsmath,amssymb,amsfonts}			% Dùng để chèn các công thức Toán
+\usepackage{makecell}								% Dùng để làm nổi bật header của bảng
+\usepackage{float}								% Dùng để thiết đặt thuộc tính H (here) cho ảnh
+\usepackage{soulutf8}           % Dùng để tạo highlight (\hl) và bỏ lỗi kí tự utf8 trong highlight (\hl)
+\usepackage[font={small, it}, labelfont={bf}, justification=centering, labelsep=period]{caption}   % Dùng để tạo và tùy chỉnh caption trong Fig và Table 
+\usepackage{multirow}           % Multirow trong bang
+\usepackage{sectsty}
+\usepackage{amsmath}
+% \usepackage{apacite}
+
+\usepackage{pdfpages}
+\usepackage{comment}
+\usepackage[shortlabels]{enumitem}
+
+\usepackage[backend=biber,
+style=ieee,
+% style=alphabetic,
+natbib=true,
+%style=reading,
+sorting=none,
+citestyle = numeric
+]{biblatex}
+\addbibresource{tham_khao/tai_lieu.bib}
+\renewcommand*{\bibfont}{\normalfont\fontsize{13}{13}\selectfont}
+
+\usepackage{pdfpages} 
+
+\usepackage{fancybox}
+
+
+% \usepackage[linesnumbered,ruled,vlined]{algorithm2e}
+% \SetKwInput{KwInput}{Input}                % Set the Input
+% \SetAlgorithmName{Thuật toán}{thuật toán}{List of Heuristics}  % Đổi tên Algorithm thành thuật toán
+
+
+\usepackage{algorithm}
+\usepackage{algpseudocode}
+
+\floatname{algorithm}{Thuật toán}
+\renewcommand{\algorithmicrequire}{\textbf{Đầu vào:}}
+\renewcommand{\algorithmicensure}{\textbf{Đầu ra:}}
+
+
+\DeclareMathOperator*{\argmax}{arg\,max}
+
+% \chapternumberfont{\tiny} 
+% \chaptertitlefont{\huge}
+% \chaptertitlefont{\fontsize{26pt}{20pt}\selectfont}
+
+% \usepackage{etoolbox}% http://ctan.org/pkg/etoolbox
+% \makeatletter
+% \patchcmd{\@makechapterhead}{\vspace*{50\p@}}{\vspace*{5pt}}{}{}%
+% \patchcmd{\@makeschapterhead}{\vspace*{50\p@}}{\vspace*{5pt}}{}{}%
+% \makeatother
+
+
+
+\usepackage[%  
+    colorlinks=false,
+    pdfborder={0 0 0},
+    linkcolor=black
+]{hyperref}                     % Hiển thị màu liên kết cho mục lục, bảng, hình
+\usepackage{xurl}                % Cho phép ngắt dòng URL dài ở mọi vị trí
+
+
+\usepackage{setspace}
+\setstretch{1.15} % Gian dong trong paragraph
+\setlist[itemize,enumerate]{before=\setstretch{1.15}, itemsep=0pt, parsep=0pt, partopsep=0pt} % Gian dong trong bullet/list
+\usepackage{titlesec}
+
+\titlelabel{\thetitle.\quad}   % Thêm dâu chấm sau mỗi section number và subsection number.
+
+% \titleformat{\chapter}[display]
+%     {\normalfont\huge\bfseries\centering}{\MakeUppercase{\chaptertitlename}\ \thechapter}{26pt}{\huge}
+
+\titleformat{\chapter}[display]{\fontsize{16pt}{16pt}\bfseries\centering}{\MakeUppercase{\chaptertitlename}\ \thechapter}{5pt}{}
+\titlespacing*{\chapter}{0pt}{0pt}{4pt}
+
+\setcounter{secnumdepth}{4}
+
+\sectionfont{\fontsize{13}{15}\selectfont}
+\subsectionfont{\fontsize{13}{15}\selectfont\itshape}
+\subsubsectionfont{\fontsize{13}{15}\selectfont\itshape}
+\titlespacing*{\section}{0pt}{6pt plus 1pt minus 1pt}{3pt}
+\titlespacing*{\subsection}{0pt}{5pt plus 1pt minus 1pt}{2pt}
+\titlespacing*{\subsubsection}{0pt}{4pt plus 1pt minus 1pt}{2pt}
+
+\usepackage{indentfirst}                        % Thụt đầu dòng theo tabindent
+% \titlespacing*{\section}                        % định dạng dãn dòng cho section và subsection
+% {0pt}{5.5ex plus 1ex minus .2ex}{4.3ex plus .2ex}
+% \titlespacing*{\subsection}
+% {0pt}{5.5ex plus 1ex minus .2ex}{4.3ex plus .2ex}
+
+\usepackage[skip=10pt plus1pt, indent=30pt]{parskip} % định dạng dãn dòng before và after, tabindent
+
+% Định dạng cho header của bảng
+\renewcommand\theadfont{\bfseries}
+
+% Định dạng cho code
+\usepackage{fancyvrb}			% Phiên bản nâng cao của verbatim, dùng để chèn code
+\fvset{
+	tabsize=4,					% Định tabsize 
+	frame=single,				% Khung
+}
+
+\title{Triển khai và quản trị hệ thống quản lý thư viện với Docker Compose}
+\author{Phạm Văn Huynh}
+
+% Header và footer 
+\pagestyle{fancy}
+\fancyhf{}
+\chead{\thepage}
+\renewcommand{\headrulewidth}{0pt}
+
+\fancypagestyle{plain}{%
+\fancyhf{}
+\chead{\thepage}
+\renewcommand{\headrulewidth}{0pt}
+}
+
+
+% \usepackage{titletoc}%
+%       \titlecontents{chapter}[0em]{\lsstyle\smallskip\bfseries}%\vspace{1cm}%
+%       {}%
+%       {\bfseries}%numberless%
+%       {\hfill\contentspage}[\medskip]%
+
+% \patchcmd{\tableofcontents}{\contentsname}{\MakeUppercase\contentsname}{}{}
+% \patchcmd{\listoftables}{\listtablename}{\MakeUppercase\listtablename}{}{}
+% \patchcmd{\listoffigures}{\listfigurename}{\MakeUppercase\listfigurename}{}{}
+% \patchcmd{\bibliography}{\bibname}{\MakeUppercase\bibname}{}{}
+
+\newcommand{\mychapter}[2]{
+    \setcounter{chapter}{#1}
+    \setcounter{section}{0}
+    \chapter*{#2}
+    % \addcontentsline{toc}{chapter}{#2}
+}
+
+\usepackage{tocloft}
+  \cftsetindents{table}{0em}{6em}
+  \cftsetindents{figure}{0em}{6em}
+  \renewcommand\cfttabpresnum{Bảng } % prefix "Table " to table number
+  \renewcommand{\cftfigpresnum}{Hình } % put before the number
+  \renewcommand{\cfttabaftersnum}{.}
+  \renewcommand{\cftfigaftersnum}{.}
+ 
+\renewcommand{\cfttoctitlefont}{\hfill\large\bfseries}
+\renewcommand{\cftaftertoctitle}{\hfill}
+\renewcommand{\cftlottitlefont}{\hfill\large\bfseries}
+\renewcommand{\cftafterlottitle}{\hfill}
+\renewcommand{\cftloftitlefont}{\hfill\large\bfseries}
+\renewcommand{\cftafterloftitle}{\hfill}
+
+% \renewcommand\cftchapafterpnum{\vskip4pt}  % Dãn dòng giữa các item trong TOC 
+% \renewcommand\cftsecafterpnum{\vskip4pt}
+\setlength{\cftbeforetoctitleskip}{0em}      % Dãn dòng trước tiêu đề mục lục
+\setlength{\cftaftertoctitleskip}{2em}       % Dãn dòng sau tiêu đề mục lục
+\setlength{\cftbeforelottitleskip}{0em}      % Dãn dòng trước tiêu đề danh sách bảng
+\setlength{\cftbeforeloftitleskip}{0em}      % Dãn dòng trước tiêu đề danh sách hình
+
+\renewcommand{\cftsecaftersnum}{.}%         % Thêm dấu chấm vào sau mỗi section number ở mục lục 
+\renewcommand{\cftsubsecaftersnum}{.}%      % Thêm dấu chấm vào sau mỗi subsection number ở mục lục 
+
+
+% Tên tiêu đề viết hoa sẵn (thay cho \MakeUppercase, tránh lỗi với TeX Live mới)
+\AtBeginDocument{%
+  \renewcommand{\contentsname}{MỤC LỤC}%
+  \renewcommand{\listtablename}{DANH SÁCH BẢNG}%
+  \renewcommand{\listfigurename}{DANH SÁCH HÌNH VẼ}%
+}
+
+\begin{document}
+
+% Bìa và thông tin ban đầu
+\hypersetup{pageanchor=false}
+\subfile{bia/bia_ngoai}
+\subfile{bia/bia_trong}
+
+\hypersetup{pageanchor=true}
+\pagenumbering{roman}
+
+\clearpage
+% \chapter*{LỜI CAM ĐOAN}
+\addcontentsline{toc}{chapter}{LỜI CAM ĐOAN}
+\subfile{chuong/loi_cam_doan}
+
+\clearpage
+\chapter*{LỜI CẢM ƠN}
+\addcontentsline{toc}{chapter}{LỜI CẢM ƠN}
+\subfile{chuong/loi_cam_on}
+
+\clearpage
+\tableofcontents
+
+\clearpage
+\addcontentsline{toc}{chapter}{DANH SÁCH BẢNG}
+\listoftables
+
+\clearpage
+\addcontentsline{toc}{chapter}{DANH SÁCH HÌNH VẼ}
+\listoffigures
+
+\clearpage
+\chapter*{DANH MỤC TỪ VIẾT TẮT}
+\addcontentsline{toc}{chapter}{DANH MỤC TỪ VIẾT TẮT}
+\subfile{chuong/viet_tat}
+
+\clearpage
+\pagenumbering{arabic}
+
+\mychapter{0}{MỞ ĐẦU}
+\addcontentsline{toc}{chapter}{MỞ ĐẦU}
+\subfile{chuong/mo_dau}
+
+% CHƯƠNG 1
+\setcounter{table}{0}
+\setcounter{figure}{0}
+\mychapter{1}{CHƯƠNG 1: CƠ SỞ LÝ THUYẾT}
+\addcontentsline{toc}{chapter}{CHƯƠNG 1: CƠ SỞ LÝ THUYẾT}
+\subfile{chuong/chuong_1}
+
+% CHƯƠNG 2
+\setcounter{table}{0}
+\setcounter{figure}{0}
+\mychapter{2}{CHƯƠNG 2: KHẢO SÁT VÀ PHÂN TÍCH HỆ THỐNG}
+\addcontentsline{toc}{chapter}{CHƯƠNG 2: KHẢO SÁT VÀ PHÂN TÍCH HỆ THỐNG}
+\subfile{chuong/chuong_2}
+
+% CHƯƠNG 3
+\setcounter{table}{0}
+\setcounter{figure}{0}
+\mychapter{3}{CHƯƠNG 3: THIẾT KẾ HỆ THỐNG}
+\addcontentsline{toc}{chapter}{CHƯƠNG 3: THIẾT KẾ HỆ THỐNG}
+\subfile{chuong/chuong_3}
+
+% CHƯƠNG 4
+\setcounter{table}{0}
+\setcounter{figure}{0}
+\mychapter{4}{CHƯƠNG 4: TRIỂN KHAI VÀ KẾT QUẢ}
+\addcontentsline{toc}{chapter}{CHƯƠNG 4: TRIỂN KHAI VÀ KẾT QUẢ}
+\subfile{chuong/chuong_4}
+
+\clearpage
+\chapter*{KẾT LUẬN}
+\addcontentsline{toc}{chapter}{KẾT LUẬN}
+\subfile{chuong/ket_luan}
+
+\clearpage
+\printbibliography[heading=bibintoc,title={TÀI LIỆU THAM KHẢO}]
+
+\clearpage
+\chapter*{NHẬN XÉT CỦA GIÁO VIÊN HƯỚNG DẪN}
+\addcontentsline{toc}{chapter}{NHẬN XÉT CỦA GIÁO VIÊN HƯỚNG DẪN}
+\subfile{chuong/nhan_xet_gvhd}
+
+\end{document}
+
+

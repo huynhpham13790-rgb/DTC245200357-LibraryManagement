@@ -4,3 +4,4 @@ logs/
 nginx/ssl/*.pem
 *.odt
 *.pdf
+!bao_cao/main.pdf

@@ -1,0 +1,118 @@
+\documentclass[../main.tex]{subfiles}
+
+\begin{document}
+
+\textit{Chương này phân tích yêu cầu của đề bài, khảo sát nghiệp vụ thư viện và xác định các yêu cầu chức năng, phi chức năng của hệ thống.}
+
+Việc phân tích được thực hiện theo quy trình kỹ nghệ yêu cầu gồm khảo sát, đặc tả và kiểm chứng yêu cầu~\cite{sommerville2016software}.
+
+\section{Yêu cầu của đề bài}
+Đề tài 01 yêu cầu triển khai một ứng dụng web quản lý thư viện (mượn/trả sách, quản lý độc giả, sách) sử dụng PostgreSQL và pgAdmin, cùng các yêu cầu kỹ thuật chung được tổng hợp trong Bảng~\ref{tab:yeu-cau-de-bai}.
+
+\begin{longtable}{|c|p{5.2cm}|p{8.3cm}|}
+\caption{Yêu cầu của đề bài và cách đáp ứng}
+\label{tab:yeu-cau-de-bai}\\
+\hline
+\textbf{STT} & \textbf{Yêu cầu} & \textbf{Cách đáp ứng trong đề tài} \\
+\hline
+\endfirsthead
+\hline
+\textbf{STT} & \textbf{Yêu cầu} & \textbf{Cách đáp ứng trong đề tài} \\
+\hline
+\endhead
+1 & Quản lý mã nguồn trên GitHub, commit rõ ràng, có README & Repository \nolinkurl{DTC245200357-LibraryManagement}, các commit theo từng giai đoạn, README hướng dẫn chạy \\ \hline
+2 & Triển khai ứng dụng web + DB + công cụ quản lý DB & Ứng dụng Node.js/Express, PostgreSQL 16, pgAdmin 4 \\ \hline
+3 & Nginx reverse proxy, HTTPS tự ký hoặc security header & Nginx với chứng chỉ tự ký, chuyển hướng HTTP sang HTTPS, 5 security header \\ \hline
+4 & Prometheus + Grafana giám sát container, web server, DB & cAdvisor, Nginx Exporter, Postgres Exporter, metrics ứng dụng; dashboard Grafana được provision sẵn \\ \hline
+5 & Loki + Promtail, truy vấn LogQL (2--3 query) & Promtail thu thập access/error log Nginx; 4 truy vấn LogQL minh họa \\ \hline
+6 & Hardening (non-root, cô lập mạng, mật khẩu mạnh, hạn chế quyền, security header) & Áp dụng 10 biện pháp, trình bày tại mục~\ref{sec:thiet-ke-bao-mat} \\ \hline
+7 & Báo cáo tối thiểu 10 trang, có hình minh họa & Báo cáo này \\ \hline
+\end{longtable}
+
+\section{Khảo sát nghiệp vụ thư viện}
+Qua tìm hiểu hoạt động của thư viện trường đại học, quy trình nghiệp vụ chính gồm:
+\begin{enumerate}
+    \item \textbf{Bổ sung sách:} thủ thư nhập thông tin đầu sách (tên, tác giả, ISBN, thể loại, nhà xuất bản, năm xuất bản), số lượng bản và vị trí kệ.
+    \item \textbf{Cấp thẻ độc giả:} độc giả là sinh viên, giảng viên, cán bộ hoặc khách; mỗi người có một mã thẻ duy nhất và thời hạn sử dụng thẻ.
+    \item \textbf{Cho mượn sách:} thủ thư kiểm tra thẻ còn hạn, độc giả không nợ sách quá hạn, chưa vượt số sách tối đa và sách còn bản; sau đó lập phiếu mượn ghi rõ hạn trả.
+    \item \textbf{Gia hạn:} độc giả được gia hạn khi phiếu chưa quá hạn.
+    \item \textbf{Nhận trả sách:} thủ thư ghi nhận ngày trả; nếu trễ hạn thì thu tiền phạt theo số ngày trễ.
+    \item \textbf{Theo dõi, báo cáo:} thống kê số sách, số lượt mượn, danh sách sách quá hạn để nhắc nhở.
+\end{enumerate}
+
+Các quy định nghiệp vụ được áp dụng trong hệ thống được tổng hợp trong Bảng~\ref{tab:quy-dinh}.
+
+\begin{table}[H]
+\centering
+\caption{Quy định nghiệp vụ mượn -- trả}
+\label{tab:quy-dinh}
+\begin{tabular}{|c|p{6cm}|p{6.5cm}|}
+\hline
+\textbf{STT} & \textbf{Quy định} & \textbf{Giá trị} \\
+\hline
+1 & Số sách tối đa mỗi độc giả mượn cùng lúc & 5 cuốn \\ \hline
+2 & Thời hạn mượn & 7, 14 (mặc định) hoặc 30 ngày \\ \hline
+3 & Gia hạn & Cộng thêm 7 ngày, tối đa 1 lần, chỉ khi chưa quá hạn \\ \hline
+4 & Tiền phạt trả muộn & 5.000 đồng / ngày trễ \\ \hline
+5 & Điều kiện mượn & Thẻ còn hạn, không có sách quá hạn, sách còn bản, không mượn trùng cuốn đang mượn \\ \hline
+6 & Xóa dữ liệu & Không xóa sách / độc giả đã có lịch sử mượn \\ \hline
+\end{tabular}
+\end{table}
+
+\section{Tác nhân của hệ thống}
+\begin{itemize}
+    \item \textbf{Quản trị viên (admin):} có toàn quyền, quản lý tài khoản thủ thư.
+    \item \textbf{Thủ thư:} quản lý sách, độc giả, thực hiện mượn -- trả -- gia hạn và xem thống kê.
+    \item \textbf{Quản trị hệ thống (DevOps):} vận hành hạ tầng qua pgAdmin, Grafana, Prometheus, Loki.
+\end{itemize}
+
+\section{Yêu cầu chức năng}
+\begin{longtable}{|c|p{3.6cm}|p{9.8cm}|}
+\caption{Yêu cầu chức năng của ứng dụng}
+\label{tab:yeu-cau-chuc-nang}\\
+\hline
+\textbf{STT} & \textbf{Chức năng} & \textbf{Mô tả} \\
+\hline
+\endfirsthead
+\hline
+\textbf{STT} & \textbf{Chức năng} & \textbf{Mô tả} \\
+\hline
+\endhead
+1 & Đăng nhập / đăng xuất & Thủ thư đăng nhập bằng tài khoản được cấp; khóa tạm thời khi nhập sai nhiều lần; đổi mật khẩu \\ \hline
+2 & Tổng quan & Hiển thị số đầu sách, bản sách, độc giả, phiếu đang mượn, phiếu quá hạn; biểu đồ mượn -- trả 7 ngày; top sách mượn nhiều; cơ cấu kho theo thể loại \\ \hline
+3 & Quản lý kho sách & Thêm, sửa, xóa sách; quản lý ISBN, thể loại, NXB, năm, vị trí kệ, số lượng; tìm kiếm theo tên/tác giả/ISBN, lọc theo thể loại; hiển thị số bản còn lại \\ \hline
+4 & Quản lý độc giả & Cấp thẻ, sửa, xóa độc giả; phân loại đối tượng; quản lý hạn thẻ; tìm kiếm; xem lịch sử mượn của từng độc giả \\ \hline
+5 & Mượn sách & Lập phiếu mượn, kiểm tra các điều kiện nghiệp vụ, tự tính hạn trả \\ \hline
+6 & Trả sách & Ghi nhận trả sách, tự động tính tiền phạt nếu trễ hạn \\ \hline
+7 & Gia hạn & Gia hạn phiếu mượn thêm 7 ngày theo quy định \\ \hline
+8 & Sách quá hạn & Danh sách phiếu quá hạn kèm số ngày trễ và phạt tạm tính, cảnh báo trên menu \\ \hline
+9 & Quản lý tài khoản & Quản trị viên tạo / xóa tài khoản thủ thư, phân quyền \\ \hline
+\end{longtable}
+
+\section{Yêu cầu phi chức năng}
+\begin{itemize}
+    \item \textbf{Triển khai:} toàn bộ dịch vụ chạy bằng Docker Compose, khởi động bằng một lệnh, dữ liệu bền vững qua volume.
+    \item \textbf{Bảo mật:} truy cập qua HTTPS; mật khẩu được băm; container chạy quyền tối thiểu; cơ sở dữ liệu không lộ ra ngoài.
+    \item \textbf{Giám sát được:} theo dõi được tài nguyên container, lưu lượng web, tình trạng cơ sở dữ liệu và các thao tác nghiệp vụ.
+    \item \textbf{Truy vết được:} log được thu thập tập trung, truy vấn được theo thời gian và nội dung.
+    \item \textbf{Toàn vẹn dữ liệu:} các thao tác mượn -- trả thực hiện trong giao dịch, không cho mượn vượt số bản kể cả khi nhiều thủ thư thao tác đồng thời.
+    \item \textbf{Dễ sử dụng:} giao diện tiếng Việt, bố cục rõ ràng, có thông báo lỗi cụ thể, dùng được trên điện thoại.
+\end{itemize}
+
+\section{Kế hoạch thực hiện}
+\begin{table}[H]
+\centering
+\caption{Các giai đoạn thực hiện và commit tương ứng}
+\label{tab:ke-hoach}
+\begin{tabular}{|c|p{6.5cm}|p{6cm}|}
+\hline
+\textbf{GĐ} & \textbf{Công việc} & \textbf{Kết quả} \\
+\hline
+1 & Xây dựng ứng dụng, PostgreSQL, pgAdmin, Nginx reverse proxy + SSL & Commit 1 \\ \hline
+2 & Tích hợp Prometheus, Grafana và các exporter & Commit 2 \\ \hline
+3 & Triển khai Loki, Promtail; hardening hệ thống & Commit 3 \\ \hline
+4 & Rà soát, sửa lỗi cấu hình, nâng cấp chức năng ứng dụng, viết báo cáo & Các commit \texttt{fix}/\texttt{feat} bổ sung \\ \hline
+\end{tabular}
+\end{table}
+
+\end{document}

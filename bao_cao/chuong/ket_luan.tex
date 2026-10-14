@@ -1,0 +1,36 @@
+\documentclass[../main.tex]{subfiles}
+
+\begin{document}
+
+\section*{Kết quả đạt được}
+Báo cáo đã hoàn thành đầy đủ các yêu cầu của Đề tài 01:
+\begin{itemize}
+    \item Xây dựng ứng dụng web quản lý thư viện với các chức năng đăng nhập và phân quyền, trang tổng quan thống kê, quản lý kho sách, quản lý độc giả, mượn -- trả -- gia hạn, tính tiền phạt, theo dõi sách quá hạn và quản lý tài khoản thủ thư.
+    \item Triển khai 11 dịch vụ bằng Docker Compose: ứng dụng, PostgreSQL, pgAdmin, Nginx, Prometheus, Grafana, Loki, Promtail và ba exporter.
+    \item Nginx làm reverse proxy duy nhất với HTTPS tự ký, các security header và giới hạn tần suất đăng nhập.
+    \item Giám sát container, web server, cơ sở dữ liệu và các thao tác nghiệp vụ qua dashboard Grafana được quản lý bằng mã nguồn.
+    \item Thu thập log tập trung bằng Loki + Promtail và truy vấn bằng 4 câu LogQL.
+    \item Áp dụng 10 biện pháp hardening, trong đó có non-root container, cô lập mạng, mật khẩu mạnh, hạn chế quyền và security header.
+    \item Mã nguồn được quản lý trên GitHub với các commit rõ ràng và README hướng dẫn chạy.
+\end{itemize}
+
+Qua quá trình thực hiện, em đã rút ra một số kinh nghiệm thực tế: cấu hình giám sát cần được kiểm tra bằng số liệu thật (exporter có thể báo UP nhưng không lấy được dữ liệu); mật khẩu chứa ký tự đặc biệt có thể làm hỏng chuỗi kết nối dạng URL; Docker không tự tạo lại mạng đã tồn tại khi thay đổi cấu hình; và một biện pháp bảo mật (chạy non-root) có thể kéo theo thay đổi ở thành phần khác (cổng của pgAdmin).
+
+\section*{Hạn chế}
+\begin{itemize}
+    \item Chứng chỉ SSL là chứng chỉ tự ký nên trình duyệt vẫn cảnh báo.
+    \item Phiên đăng nhập lưu trong bộ nhớ của ứng dụng, sẽ mất khi khởi động lại container và chưa hỗ trợ chạy nhiều bản sao.
+    \item Promtail mới thu thập log của Nginx, chưa thu thập log của ứng dụng và các container khác.
+    \item Chưa cấu hình cảnh báo (alerting) và chưa có cơ chế sao lưu cơ sở dữ liệu tự động.
+\end{itemize}
+
+\section*{Hướng phát triển}
+\begin{itemize}
+    \item Sử dụng chứng chỉ Let's Encrypt khi triển khai với tên miền thật.
+    \item Lưu phiên đăng nhập trong Redis, mở rộng ứng dụng thành nhiều bản sao phía sau Nginx.
+    \item Thu thập log toàn bộ container và cấu hình Alertmanager / Grafana Alerting gửi cảnh báo qua email hoặc Telegram.
+    \item Sao lưu PostgreSQL định kỳ, bổ sung CI/CD với GitHub Actions và quét lỗ hổng image.
+    \item Bổ sung chức năng cho độc giả tự tra cứu, đặt trước sách và nhận thông báo nhắc hạn trả.
+\end{itemize}
+
+\end{document}

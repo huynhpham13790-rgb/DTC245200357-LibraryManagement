@@ -1,0 +1,213 @@
+\documentclass[../main.tex]{subfiles}
+
+\begin{document}
+
+\textit{Chương này trình bày thiết kế kiến trúc tổng thể, thiết kế mạng, cơ sở dữ liệu, API của ứng dụng cùng thiết kế các thành phần giám sát, log và bảo mật.}
+
+\section{Kiến trúc tổng thể}
+Hệ thống gồm 11 container chạy trên cùng một máy chủ Docker, được chia thành ba nhóm: nhóm ứng dụng (Nginx, Web App, pgAdmin), nhóm dữ liệu (PostgreSQL) và nhóm giám sát (Prometheus, Grafana, Loki, Promtail và ba exporter). Kiến trúc được minh họa trong Hình~\ref{fig:kien-truc}.
+
+\tikzset{
+  svc/.style={draw, rounded corners=3pt, minimum width=2.55cm, minimum height=0.9cm, align=center, font=\small, fill=white},
+  net/.style={draw, dashed, rounded corners=6pt, inner sep=7pt},
+  flow/.style={-{Stealth[length=2mm]}, thick},
+  lbl/.style={font=\scriptsize\itshape}
+}
+\begin{figure}[H]
+\centering
+\begin{tikzpicture}[node distance=0.55cm and 0.45cm]
+  \node[svc, fill=gray!15] (user) {Trình duyệt\\(Thủ thư / Quản trị)};
+  \node[svc, fill=green!15, below=0.9cm of user] (nginx) {\textbf{Nginx}\\:80 / :443};
+  \node[svc, fill=blue!10, below left=1.0cm and 1.3cm of nginx] (app) {\textbf{Web App}\\Node.js :3000};
+  \node[svc, fill=blue!10, below=1.0cm of nginx] (pgadmin) {\textbf{pgAdmin 4}\\:8080};
+  \node[svc, fill=orange!15, below right=1.0cm and 1.3cm of nginx] (grafana) {\textbf{Grafana}\\:3000};
+  \node[svc, fill=yellow!20, below=1.2cm of pgadmin] (pg) {\textbf{PostgreSQL 16}\\:5432};
+  \node[svc, fill=orange!15, below=1.2cm of grafana] (prom) {\textbf{Prometheus}\\:9090};
+  \node[svc, fill=orange!15, right=0.5cm of prom] (loki) {\textbf{Loki}\\:3100};
+  \node[svc, fill=orange!8, below=0.8cm of prom] (exp) {cAdvisor, Nginx \&\\Postgres Exporter};
+  \node[svc, fill=orange!8, below=0.8cm of loki] (promtail) {\textbf{Promtail}\\(log Nginx)};
+
+  \draw[flow] (user) -- node[right, lbl]{HTTPS} (nginx);
+  \draw[flow] (nginx) -- node[left, lbl, pos=0.4]{/} (app);
+  \draw[flow] (nginx) -- node[right, lbl]{/pgadmin/} (pgadmin);
+  \draw[flow] (nginx) -- node[right, lbl, pos=0.4]{/grafana/} (grafana);
+  \draw[flow] (app) |- node[lbl, above, pos=0.75]{SQL} (pg);
+  \draw[flow] (pgadmin) -- (pg);
+  \draw[flow] (grafana) -- node[right, lbl]{PromQL} (prom);
+  \draw[flow] (grafana.east) -| node[above, lbl, pos=0.25]{LogQL} (loki);
+  \draw[flow] (prom) -- node[right, lbl]{scrape} (exp);
+  \draw[flow] (promtail) -- node[right, lbl]{push} (loki);
+
+  \begin{scope}[on background layer]
+    \node[net, draw=green!50!black, fit=(nginx)(app)(pgadmin)(grafana), label={[lbl, text=green!40!black]north west:frontend\_net}] {};
+    \node[net, draw=red!60!black, fit=(pg)(pgadmin.south), inner sep=10pt, label={[lbl, text=red!60!black]south:backend\_net (internal)}] {};
+    \node[net, draw=orange!70!black, fit=(prom)(loki)(exp)(promtail), label={[lbl, text=orange!60!black]south:monitoring\_net}] {};
+  \end{scope}
+\end{tikzpicture}
+\caption{Kiến trúc tổng thể của hệ thống}
+\label{fig:kien-truc}
+\end{figure}
+
+Luồng hoạt động chính:
+\begin{enumerate}
+    \item Người dùng truy cập \url{http://localhost}, Nginx trả mã 301 chuyển sang \url{https://localhost}.
+    \item Nginx kết thúc TLS, gắn security header và chuyển tiếp yêu cầu tới dịch vụ tương ứng theo đường dẫn.
+    \item Web App xử lý nghiệp vụ, truy vấn PostgreSQL qua mạng \texttt{backend\_net}.
+    \item Prometheus định kỳ 5 giây thu thập metrics từ Web App và các exporter; Promtail đọc log Nginx và đẩy về Loki.
+    \item Quản trị viên xem dashboard và truy vấn log trên Grafana tại \url{https://localhost/grafana/}.
+\end{enumerate}
+
+\section{Thiết kế mạng}
+\begin{table}[H]
+\centering
+\caption{Phân vùng mạng Docker}
+\label{tab:mang}
+\begin{tabular}{|p{3cm}|p{5.8cm}|p{5cm}|}
+\hline
+\textbf{Mạng} & \textbf{Thành viên} & \textbf{Mục đích} \\
+\hline
+frontend\_net & Nginx, Web App, pgAdmin, Grafana & Nginx chuyển tiếp yêu cầu tới các dịch vụ có giao diện \\ \hline
+backend\_net (\texttt{internal: true}) & PostgreSQL, Web App, pgAdmin, Postgres Exporter & Truy cập cơ sở dữ liệu; không có đường ra Internet, không publish cổng \\ \hline
+monitoring\_net & Prometheus, Grafana, Loki, Promtail, các exporter, Web App, Nginx & Thu thập metrics và log \\ \hline
+\end{tabular}
+\end{table}
+
+Chỉ Nginx publish cổng 80, 443 ra máy chủ. Prometheus chỉ bind \texttt{127.0.0.1:9090} để quản trị viên xem trên chính máy chủ. Trang \texttt{stub\_status} của Nginx nằm ở cổng nội bộ 8080, không publish.
+
+\section{Thiết kế cơ sở dữ liệu}
+Cơ sở dữ liệu \texttt{library\_system} gồm 4 bảng, quan hệ giữa các bảng được thể hiện trong Hình~\ref{fig:erd}.
+
+\tikzset{ent/.style={draw, rectangle split, rectangle split parts=2, font=\scriptsize, align=left, rounded corners=2pt, fill=white, rectangle split part fill={blue!12,white}}}
+\begin{figure}[H]
+\centering
+\begin{tikzpicture}
+  \node[ent] (books) {\textbf{books}
+    \nodepart{two}\underline{id} SERIAL\\title, author\\isbn, category\\publisher, publish\_year\\shelf, quantity\\created\_at};
+  \node[ent, right=1.6cm of books] (br) {\textbf{borrow\_records}
+    \nodepart{two}\underline{id} SERIAL\\book\_id \textit{(FK)}\\reader\_id \textit{(FK)}\\borrow\_date, due\_date\\return\_date, status\\renew\_count, fine\\librarian};
+  \node[ent, right=1.6cm of br] (readers) {\textbf{readers}
+    \nodepart{two}\underline{id} SERIAL\\name, card\_id \textit{(UNIQUE)}\\phone, email\\reader\_type\\card\_expiry\\created\_at};
+  \node[ent, below=0.6cm of br] (lib) {\textbf{librarians}
+    \nodepart{two}\underline{id} SERIAL\\username \textit{(UNIQUE)}\\full\_name\\password\_hash (scrypt)\\role (admin | librarian)};
+  \draw[thick] (books.east) -- node[above, font=\scriptsize]{1 \quad\quad n} (br.west);
+  \draw[thick] (readers.west) -- node[above, font=\scriptsize]{1 \quad\quad n} (br.east);
+\end{tikzpicture}
+\caption{Sơ đồ quan hệ thực thể (ERD)}
+\label{fig:erd}
+\end{figure}
+
+\begin{itemize}
+    \item \textbf{books:} mỗi dòng là một đầu sách; \texttt{quantity} là tổng số bản. Số bản còn lại không lưu cố định mà được tính bằng \texttt{quantity} trừ số phiếu đang mượn, tránh sai lệch dữ liệu.
+    \item \textbf{readers:} thông tin độc giả, mã thẻ là duy nhất, có hạn thẻ \texttt{card\_expiry}.
+    \item \textbf{borrow\_records:} mỗi dòng là một phiếu mượn một cuốn sách; \texttt{status} nhận giá trị \texttt{borrowing} hoặc \texttt{returned}; phiếu quá hạn là phiếu \texttt{borrowing} có \texttt{due\_date} nhỏ hơn thời điểm hiện tại.
+    \item \textbf{librarians:} tài khoản đăng nhập, mật khẩu được băm bằng thuật toán scrypt kèm salt ngẫu nhiên.
+\end{itemize}
+Lược đồ được ứng dụng tự khởi tạo và nâng cấp khi khởi động (\texttt{CREATE TABLE IF NOT EXISTS}, \texttt{ALTER TABLE \ldots{} ADD COLUMN IF NOT EXISTS}) nên dữ liệu cũ được giữ nguyên khi cập nhật phiên bản.
+
+\section{Thiết kế API}
+Ứng dụng cung cấp REST API định dạng JSON (Bảng~\ref{tab:api}). Mọi API nghiệp vụ yêu cầu cookie phiên đăng nhập.
+
+\begin{longtable}{|p{2.1cm}|p{5.2cm}|p{6.9cm}|}
+\caption{Danh sách API của ứng dụng}
+\label{tab:api}\\
+\hline
+\textbf{Method} & \textbf{Đường dẫn} & \textbf{Chức năng} \\
+\hline
+\endfirsthead
+\hline
+\textbf{Method} & \textbf{Đường dẫn} & \textbf{Chức năng} \\
+\hline
+\endhead
+POST & /api/login, /api/logout & Đăng nhập, đăng xuất \\ \hline
+GET & /api/me & Thông tin người đang đăng nhập \\ \hline
+POST & /api/me/password & Đổi mật khẩu \\ \hline
+GET & /api/stats & Số liệu thống kê cho trang tổng quan \\ \hline
+GET, POST & /api/books & Danh sách (tìm kiếm, lọc), thêm sách \\ \hline
+PUT, DELETE & /api/books/:id & Sửa, xóa sách \\ \hline
+GET & /api/categories & Danh sách thể loại \\ \hline
+GET, POST & /api/readers & Danh sách (tìm kiếm), cấp thẻ độc giả \\ \hline
+PUT, DELETE & /api/readers/:id & Sửa, xóa độc giả \\ \hline
+GET & /api/readers/:id/history & Lịch sử mượn của độc giả \\ \hline
+GET, POST & /api/borrow & Danh sách phiếu (lọc theo trạng thái), lập phiếu mượn \\ \hline
+POST & /api/borrow/:id/return & Trả sách, tính tiền phạt \\ \hline
+POST & /api/borrow/:id/renew & Gia hạn phiếu mượn \\ \hline
+GET, POST, DELETE & /api/users, /api/users/:id & Quản lý tài khoản thủ thư (chỉ admin) \\ \hline
+GET & /metrics, /healthz & Metrics cho Prometheus, kiểm tra sức khỏe (Nginx chặn /metrics từ bên ngoài) \\ \hline
+\end{longtable}
+
+\section{Thiết kế xử lý mượn sách}
+Nghiệp vụ mượn sách cần đảm bảo không cho mượn vượt số bản kể cả khi hai thủ thư cùng thao tác. Vì vậy toàn bộ việc kiểm tra và ghi phiếu được thực hiện trong một giao dịch, dòng sách và dòng độc giả được khóa bằng \texttt{SELECT \ldots{} FOR UPDATE} (Thuật toán~\ref{alg:muon-sach}).
+
+\begin{algorithm}[H]
+\caption{Lập phiếu mượn sách}
+\label{alg:muon-sach}
+\begin{algorithmic}[1]
+\Require Mã sách $b$, mã độc giả $r$, số ngày mượn $d$
+\Ensure Phiếu mượn mới hoặc thông báo lỗi
+\State \textbf{BEGIN} giao dịch
+\State Khóa dòng sách $b$; \textbf{if} không tồn tại \textbf{then} báo lỗi 404
+\If{số phiếu đang mượn của $b \geq$ quantity}
+    \State \textbf{ROLLBACK}; báo lỗi ``Sách đã được mượn hết''
+\EndIf
+\State Khóa dòng độc giả $r$, đếm số sách đang mượn $n$ và số sách quá hạn $q$
+\If{thẻ hết hạn \textbf{or} $q > 0$ \textbf{or} $n \geq 5$ \textbf{or} $r$ đang mượn $b$}
+    \State \textbf{ROLLBACK}; báo lỗi tương ứng
+\EndIf
+\State Thêm phiếu: due\_date $\gets$ hiện tại $+ d$ ngày
+\State \textbf{COMMIT}; tăng metric \texttt{library\_loan\_operations\_total\{operation="borrow"\}}
+\State \Return phiếu mượn
+\end{algorithmic}
+\end{algorithm}
+
+Khi trả sách, tiền phạt được tính theo Công thức~\ref{eq:phat}:
+\begin{equation}
+\text{Phạt} = \max\left(0, \left\lceil \frac{t_{\text{trả}} - t_{\text{hạn}}}{1\ \text{ngày}} \right\rceil\right) \times 5000\ \text{(đồng)}
+\label{eq:phat}
+\end{equation}
+
+\section{Thiết kế giám sát và log}
+\begin{table}[H]
+\centering
+\caption{Các target được Prometheus thu thập}
+\label{tab:targets}
+\begin{tabular}{|p{3.4cm}|p{3.6cm}|p{7.2cm}|}
+\hline
+\textbf{Job} & \textbf{Target} & \textbf{Số liệu chính} \\
+\hline
+library-app & app:3000/metrics & Request theo route và mã trạng thái, số lần đăng nhập, số thao tác mượn/trả/gia hạn, CPU/heap Node.js \\ \hline
+cadvisor & cadvisor:8080 & CPU, RAM, mạng của từng container \\ \hline
+postgres-exporter & postgres-exporter:9187 & pg\_up, số kết nối, commit/rollback \\ \hline
+nginx-exporter & nginx-exporter:9113 & nginx\_up, kết nối đang mở, tổng request \\ \hline
+\end{tabular}
+\end{table}
+
+Dashboard Grafana \textit{Library System Overview} được provision từ file JSON trong repository, gồm 13 panel: trạng thái PostgreSQL/Nginx, số kết nối, CPU và RAM từng container, request của ứng dụng và Nginx, commit/rollback của cơ sở dữ liệu, số log lỗi theo phút (truy vấn Loki), số thao tác nghiệp vụ, kết quả đăng nhập và luồng access log.
+
+Nginx ghi access log dạng JSON (\texttt{time\_local}, \texttt{remote\_addr}, \texttt{request}, \texttt{status}, \texttt{body\_bytes\_sent}, \texttt{request\_time}, \texttt{http\_referrer}) ra thư mục \texttt{logs/nginx}. Promtail đọc thư mục này với nhãn \texttt{job="nginx"} và đẩy về Loki; nhờ định dạng JSON, LogQL có thể dùng bộ phân tích \texttt{| json} để lọc theo từng trường.
+
+\section{Thiết kế bảo mật}
+\label{sec:thiet-ke-bao-mat}
+\begin{longtable}{|c|p{4.2cm}|p{9.4cm}|}
+\caption{Các biện pháp hardening}
+\label{tab:hardening}\\
+\hline
+\textbf{STT} & \textbf{Biện pháp} & \textbf{Thực hiện} \\
+\hline
+\endfirsthead
+\hline
+\textbf{STT} & \textbf{Biện pháp} & \textbf{Thực hiện} \\
+\hline
+\endhead
+1 & Non-root container & Web App chạy \texttt{USER node} (uid 1000); pgAdmin chạy user \texttt{pgadmin} (uid 5050) ở cổng 8080 \\ \hline
+2 & Hạn chế quyền container & \texttt{no-new-privileges} cho mọi container; Web App \texttt{read\_only: true} và \texttt{cap\_drop: ALL} \\ \hline
+3 & Cô lập mạng & 3 mạng riêng; \texttt{backend\_net} là mạng \texttt{internal}; PostgreSQL không publish cổng \\ \hline
+4 & Mật khẩu mạnh, quản lý bí mật & Mật khẩu $\geq$ 12 ký tự trong file \texttt{.env} (không commit); compose báo lỗi nếu thiếu biến \\ \hline
+5 & HTTPS & Chứng chỉ tự ký, TLS 1.2/1.3, chuyển hướng HTTP $\rightarrow$ HTTPS; private key không đưa lên Git \\ \hline
+6 & Security header & X-Frame-Options, X-Content-Type-Options, X-XSS-Protection, Referrer-Policy, Strict-Transport-Security; ẩn phiên bản Nginx (\texttt{server\_tokens off}) và header \texttt{X-Powered-By} \\ \hline
+7 & Giới hạn truy cập endpoint nội bộ & Chặn \texttt{/metrics} từ ngoài; \texttt{stub\_status} chỉ cho dải IP Docker; Prometheus bind \texttt{127.0.0.1} \\ \hline
+8 & Xác thực ứng dụng & Bắt buộc đăng nhập; mật khẩu băm scrypt; cookie \texttt{HttpOnly}, \texttt{Secure}, \texttt{SameSite=Strict}; phân quyền admin/thủ thư \\ \hline
+9 & Chống dò mật khẩu & Nginx \texttt{limit\_req} 5 request/phút cho \texttt{/api/login}; ứng dụng khóa 15 phút sau 5 lần sai \\ \hline
+10 & An toàn mã nguồn & Truy vấn tham số hóa (chống SQL injection), escape HTML (chống XSS), kiểm tra dữ liệu đầu vào, giới hạn kích thước request \\ \hline
+\end{longtable}
+
+\end{document}

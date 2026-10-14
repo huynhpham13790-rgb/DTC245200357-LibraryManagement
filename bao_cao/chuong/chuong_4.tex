@@ -1,0 +1,359 @@
+\documentclass[../main.tex]{subfiles}
+
+\begin{document}
+
+\textit{Chương này trình bày môi trường, các bước triển khai và kết quả vận hành thực tế của hệ thống, kèm hình ảnh minh chứng cho từng yêu cầu của đề bài.}
+
+\section{Môi trường triển khai}
+\begin{table}[H]
+\centering
+\caption{Môi trường và phiên bản phần mềm}
+\label{tab:moi-truong}
+\begin{tabular}{|p{4.5cm}|p{9.5cm}|}
+\hline
+\textbf{Thành phần} & \textbf{Phiên bản / image} \\
+\hline
+Hệ điều hành máy chủ & Ubuntu Linux, Docker Engine + Docker Compose plugin \\ \hline
+Web App & \texttt{node:20-alpine}, Express 4, pg 8, prom-client 15 \\ \hline
+Cơ sở dữ liệu & \texttt{postgres:16-alpine}, \texttt{dpage/pgadmin4} \\ \hline
+Reverse proxy & \texttt{nginx:alpine} \\ \hline
+Giám sát & \texttt{prom/prometheus}, \texttt{grafana/grafana}, \texttt{gcr.io/cadvisor/cadvisor}, \texttt{prometheuscommunity/postgres-exporter}, \texttt{nginx/nginx-prometheus-exporter} \\ \hline
+Log tập trung & \texttt{grafana/loki}, \texttt{grafana/promtail} \\ \hline
+\end{tabular}
+\end{table}
+
+\section{Cấu trúc mã nguồn}
+Mã nguồn được lưu trữ tại \url{https://github.com/huynhpham13790-rgb/DTC245200357-LibraryManagement} với cấu trúc:
+\begin{Verbatim}
+library-management/
+|-- docker-compose.yml     # 11 dich vu, 3 mang, 3 volume
+|-- .env.example           # mau bien moi truong
+|-- README.md              # huong dan chay
+|-- app/                   # Web App Node.js
+|   |-- Dockerfile         # USER node (non-root)
+|   |-- server.js          # REST API, xac thuc, metrics
+|   `-- public/            # giao dien HTML/JS/CSS
+|-- nginx/nginx.conf       # proxy, SSL, header, rate limit
+|-- monitoring/
+|   |-- prometheus/prometheus.yml
+|   |-- promtail/promtail-config.yml
+|   `-- grafana/           # datasource + dashboard
+`-- bao_cao/               # bao cao LaTeX nay
+\end{Verbatim}
+
+\section{Các bước triển khai}
+\subsection{Tạo chứng chỉ SSL và biến môi trường}
+\begin{Verbatim}
+mkdir -p nginx/ssl
+openssl req -x509 -nodes -days 365 -newkey rsa:2048 \
+  -keyout nginx/ssl/key.pem -out nginx/ssl/cert.pem \
+  -subj "/C=VN/ST=ThaiNguyen/L=ThaiNguyen/O=ICTU/CN=library.local"
+cp .env.example .env     # sau do doi toan bo mat khau
+\end{Verbatim}
+
+\subsection{Khởi chạy hệ thống}
+\begin{Verbatim}
+docker compose up -d --build
+docker compose ps
+\end{Verbatim}
+Kết quả 11 container đều ở trạng thái \textit{Up} được thể hiện trong Hình~\ref{fig:compose-ps}. Chỉ Nginx publish cổng 80/443 ra ngoài; Prometheus chỉ bind \texttt{127.0.0.1}.
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=\textwidth]{docker-compose-ps.png}
+\caption{Kết quả lệnh docker compose ps}
+\label{fig:compose-ps}
+\end{figure}
+
+\subsection{Cấu hình Nginx chính}
+Đoạn cấu hình quan trọng của Nginx (rút gọn):
+\begin{Verbatim}
+server { listen 80; return 301 https://$host$request_uri; }
+server {
+    listen 443 ssl;
+    ssl_protocols TLSv1.2 TLSv1.3;
+    location /           { proxy_pass http://app:3000; }
+    location /pgadmin/ {
+        proxy_pass http://pgadmin:8080/;
+        proxy_set_header X-Script-Name /pgadmin; }
+    location /grafana/   { proxy_pass http://grafana:3000; }
+    location = /api/login { limit_req zone=login burst=5 nodelay;
+                            proxy_pass http://app:3000; }
+    location = /metrics  { return 404; }
+}
+\end{Verbatim}
+
+\section{Kết quả ứng dụng quản lý thư viện}
+\subsection{Đăng nhập}
+Khi truy cập \url{https://localhost/}, người dùng được yêu cầu đăng nhập (Hình~\ref{fig:login}). Nếu nhập sai, hệ thống hiển thị thông báo lỗi; sau 5 lần sai liên tiếp, tài khoản tại địa chỉ IP đó bị khóa 15 phút.
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.49\textwidth]{web-login.png}
+\hfill
+\includegraphics[width=0.49\textwidth]{web-login-fail.png}
+\caption{Màn hình đăng nhập (trái) và thông báo khi nhập sai mật khẩu (phải)}
+\label{fig:login}
+\end{figure}
+
+\subsection{Trang tổng quan}
+Sau khi đăng nhập, trang tổng quan (Hình~\ref{fig:dashboard}) hiển thị số đầu sách, số bản sách, số độc giả, số phiếu đang mượn và quá hạn; biểu đồ lượt mượn -- trả 7 ngày gần nhất; 5 cuốn được mượn nhiều nhất; cơ cấu kho theo thể loại và tổng tiền phạt đã thu. Menu bên trái hiển thị số phiếu quá hạn để thủ thư chú ý.
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=\textwidth]{web-dashboard.png}
+\caption{Trang tổng quan của ứng dụng}
+\label{fig:dashboard}
+\end{figure}
+
+\subsection{Quản lý kho sách}
+Trang Kho sách (Hình~\ref{fig:books}) liệt kê các đầu sách với mã, ISBN, tác giả, thể loại, nhà xuất bản, năm, vị trí kệ và số bản còn lại trên tổng số bản. Thủ thư có thể tìm kiếm theo tên, tác giả, ISBN, lọc theo thể loại (Hình~\ref{fig:books-search}), thêm hoặc sửa sách qua hộp thoại (Hình~\ref{fig:book-add}) và xóa sách chưa phát sinh lượt mượn.
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=\textwidth]{web-books.png}
+\caption{Danh sách kho sách}
+\label{fig:books}
+\end{figure}
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.85\textwidth]{web-books-search.png}
+\caption{Tìm kiếm sách theo từ khóa ``linux''}
+\label{fig:books-search}
+\end{figure}
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.85\textwidth]{web-book-add.png}
+\caption{Hộp thoại thêm sách mới}
+\label{fig:book-add}
+\end{figure}
+
+\subsection{Quản lý độc giả}
+Trang Độc giả (Hình~\ref{fig:readers}) quản lý mã thẻ, đối tượng, thông tin liên hệ, hạn thẻ và số sách đang mượn của từng độc giả (đánh dấu đỏ nếu có sách trễ hạn). Nút lịch sử cho phép xem toàn bộ các lần mượn của một độc giả (Hình~\ref{fig:reader-history}).
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=\textwidth]{web-readers.png}
+\caption{Danh sách độc giả}
+\label{fig:readers}
+\end{figure}
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.85\textwidth]{web-reader-history.png}
+\caption{Lịch sử mượn sách của một độc giả}
+\label{fig:reader-history}
+\end{figure}
+
+\subsection{Mượn, trả và gia hạn sách}
+Trang Mượn / Trả sách gồm biểu mẫu lập phiếu và danh sách phiếu. Khi chọn độc giả, hệ thống hiển thị ngay số sách đang mượn, hạn thẻ và cảnh báo sách quá hạn. Hình~\ref{fig:circulation} cho thấy độc giả Trần Minh Đức đang có một cuốn quá hạn nên yêu cầu mượn mới bị từ chối với thông báo cụ thể. Ngược lại, một độc giả hợp lệ được lập phiếu thành công và hệ thống báo hạn trả (Hình~\ref{fig:borrow-ok}). Các phiếu quá hạn được tô đỏ, phiếu còn hạn có thêm nút gia hạn.
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=\textwidth]{web-circulation.png}
+\caption{Từ chối cho mượn khi độc giả đang có sách quá hạn}
+\label{fig:circulation}
+\end{figure}
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=\textwidth]{web-borrow-ok.png}
+\caption{Lập phiếu mượn thành công (thông báo góc phải dưới)}
+\label{fig:borrow-ok}
+\end{figure}
+
+Khi trả sách trễ hạn, tiền phạt được tự động tính và lưu vào phiếu (Hình~\ref{fig:returned}).
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=\textwidth]{web-returned.png}
+\caption{Danh sách phiếu đã trả, có phiếu bị phạt do trễ hạn}
+\label{fig:returned}
+\end{figure}
+
+\subsection{Sách quá hạn và tài khoản thủ thư}
+\begin{figure}[H]
+\centering
+\includegraphics[width=\textwidth]{web-overdue.png}
+\caption{Danh sách sách quá hạn kèm số ngày trễ và tiền phạt tạm tính}
+\label{fig:overdue}
+\end{figure}
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=\textwidth]{web-users.png}
+\caption{Quản lý tài khoản thủ thư (chỉ quản trị viên)}
+\label{fig:users}
+\end{figure}
+
+Giao diện được thiết kế co giãn, sử dụng được trên điện thoại (Hình~\ref{fig:mobile}).
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.32\textwidth]{web-mobile.png}
+\caption{Giao diện trên màn hình điện thoại}
+\label{fig:mobile}
+\end{figure}
+
+\section{Kết quả cơ sở dữ liệu và pgAdmin}
+pgAdmin được truy cập tại \url{https://localhost/pgadmin/} thông qua Nginx. Sau khi đăng ký server với host \texttt{postgres}, cổng 5432, có thể duyệt các bảng của cơ sở dữ liệu \texttt{library\_system} và theo dõi hoạt động (Hình~\ref{fig:pgadmin}).
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=\textwidth]{pgadmin.png}
+\caption{pgAdmin 4 kết nối tới PostgreSQL qua reverse proxy}
+\label{fig:pgadmin}
+\end{figure}
+
+\section{Kết quả Nginx reverse proxy và HTTPS}
+Trình duyệt kết nối qua HTTPS với chứng chỉ tự ký có Common Name \nolinkurl{library.local}, tổ chức ICTU (Hình~\ref{fig:cert}).
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.9\textwidth]{chung-chi-ssl.png}
+\caption{Thông tin chứng chỉ SSL tự ký}
+\label{fig:cert}
+\end{figure}
+
+Hình~\ref{fig:hardening} là kết quả kiểm tra thực tế bằng dòng lệnh: phản hồi chứa đủ các security header và HSTS, không lộ phiên bản Nginx hay header \texttt{X-Powered-By}; \texttt{/metrics} bị chặn (404); API trả 401 khi chưa đăng nhập; container ứng dụng chạy uid 1000 (node), pgAdmin chạy uid 5050; mạng \texttt{backend\_net} là mạng internal; gửi liên tục yêu cầu đăng nhập bị Nginx trả 429.
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=\textwidth]{hardening-kiem-tra.png}
+\caption{Kiểm tra security header và các biện pháp hardening}
+\label{fig:hardening}
+\end{figure}
+
+\section{Kết quả giám sát với Prometheus và Grafana}
+Cả 4 target đều ở trạng thái UP (Hình~\ref{fig:prom-targets}).
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=\textwidth]{prometheus-targets.png}
+\caption{Các target trên Prometheus đều ở trạng thái UP}
+\label{fig:prom-targets}
+\end{figure}
+
+Dashboard \textit{Library System Overview} (Hình~\ref{fig:grafana}) giám sát đồng thời: \textbf{container} (CPU, RAM từng container \texttt{lib\_*} qua cAdvisor), \textbf{web server} (trạng thái, kết nối, request/s của Nginx; request/s theo route và mã trạng thái của ứng dụng), \textbf{cơ sở dữ liệu} (pg\_up, số kết nối, commit/rollback) và \textbf{nghiệp vụ} (số lượt mượn/trả/gia hạn, đăng nhập thành công/thất bại/bị chặn).
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=\textwidth]{grafana-dashboard.png}
+\caption{Dashboard Grafana giám sát container, web server và cơ sở dữ liệu}
+\label{fig:grafana}
+\end{figure}
+
+\section{Kết quả log tập trung với Loki và LogQL}
+Log của Nginx được truy vấn trên Grafana Explore với datasource Loki. Bốn truy vấn LogQL được sử dụng:
+
+\begin{table}[H]
+\centering
+\caption{Các truy vấn LogQL}
+\label{tab:logql}
+\begin{tabular}{|c|p{7.4cm}|p{6cm}|}
+\hline
+\textbf{STT} & \textbf{Truy vấn} & \textbf{Ý nghĩa} \\
+\hline
+1 & \texttt{\{job="nginx"\}} & Toàn bộ log Nginx \\ \hline
+2 & \texttt{\{job="nginx"\} | json | status >= 400} & Các request lỗi 4xx, 5xx \\ \hline
+3 & \texttt{\{job="nginx"\} |= "/api/borrow"} & Log nghiệp vụ mượn sách \\ \hline
+4 & \texttt{\{job="nginx"\} |= "/api/login"} \texttt{| json | status =\textasciitilde{} "401|429"} & Đăng nhập sai hoặc bị chặn -- phát hiện dò mật khẩu \\ \hline
+\end{tabular}
+\end{table}
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=\textwidth]{logql-1.png}
+\caption{Truy vấn 1 -- toàn bộ log Nginx}
+\label{fig:logql-1}
+\end{figure}
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=\textwidth]{logql-2.png}
+\caption{Truy vấn 2 -- lọc request có mã trạng thái từ 400 trở lên}
+\label{fig:logql-2}
+\end{figure}
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=\textwidth]{logql-3.png}
+\caption{Truy vấn 3 -- log nghiệp vụ mượn sách}
+\label{fig:logql-3}
+\end{figure}
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=\textwidth]{logql-4.png}
+\caption{Truy vấn 4 -- các lần đăng nhập sai và bị chặn}
+\label{fig:logql-4}
+\end{figure}
+
+\section{Quản lý mã nguồn trên GitHub}
+Dự án được quản lý trên GitHub với các commit theo từng giai đoạn (Hình~\ref{fig:git-log}): commit 1 triển khai ứng dụng, cơ sở dữ liệu, pgAdmin và Nginx; commit 2 tích hợp Prometheus, Grafana; commit 3 triển khai Loki, Promtail và hardening; các commit sau sửa lỗi cấu hình và nâng cấp chức năng.
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=\textwidth]{git-log.png}
+\caption{Lịch sử commit của dự án}
+\label{fig:git-log}
+\end{figure}
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=\textwidth]{github-repo.png}
+\caption{Repository trên GitHub}
+\label{fig:github}
+\end{figure}
+
+\section{Kiểm thử}
+\begin{longtable}{|c|p{5cm}|p{5.2cm}|p{2.2cm}|}
+\caption{Kết quả kiểm thử chức năng và bảo mật}
+\label{tab:kiem-thu}\\
+\hline
+\textbf{STT} & \textbf{Kịch bản} & \textbf{Kết quả mong đợi} & \textbf{Kết quả} \\
+\hline
+\endfirsthead
+\hline
+\textbf{STT} & \textbf{Kịch bản} & \textbf{Kết quả mong đợi} & \textbf{Kết quả} \\
+\hline
+\endhead
+1 & Gọi API khi chưa đăng nhập & HTTP 401 & Đạt \\ \hline
+2 & Đăng nhập sai mật khẩu & Thông báo lỗi, HTTP 401 & Đạt \\ \hline
+3 & Gửi liên tục yêu cầu đăng nhập & Nginx trả HTTP 429 & Đạt \\ \hline
+4 & Thêm sách với số lượng âm & Từ chối, báo ``Số lượng không hợp lệ'' & Đạt \\ \hline
+5 & Xóa sách đã có lịch sử mượn & Từ chối, HTTP 409 & Đạt \\ \hline
+6 & Mượn sách đã hết bản & Từ chối ``Sách đã được mượn hết'' & Đạt \\ \hline
+7 & Độc giả có sách quá hạn mượn tiếp & Từ chối, báo số sách quá hạn & Đạt \\ \hline
+8 & Gia hạn phiếu lần thứ hai & Từ chối ``chỉ được gia hạn 1 lần'' & Đạt \\ \hline
+9 & Trả sách trễ hạn & Tự tính phạt 5.000đ/ngày & Đạt \\ \hline
+10 & Mã thẻ chứa ký tự đặc biệt & Từ chối, báo định dạng không hợp lệ & Đạt \\ \hline
+11 & Tên sách chứa thẻ HTML \texttt{<b>} & Hiển thị nguyên văn, không thực thi (chống XSS) & Đạt \\ \hline
+12 & Truy cập \url{https://localhost/metrics} & HTTP 404 & Đạt \\ \hline
+13 & Truy cập \url{http://localhost} & Chuyển hướng 301 sang HTTPS & Đạt \\ \hline
+14 & Khởi động lại container ứng dụng & Dữ liệu còn nguyên, healthcheck \textit{healthy} & Đạt \\ \hline
+\end{longtable}
+
+\section{Đánh giá theo tiêu chí của đề bài}
+\begin{longtable}{|c|p{4.2cm}|p{9.4cm}|}
+\caption{Tự đánh giá mức độ hoàn thành}
+\label{tab:danh-gia}\\
+\hline
+\textbf{STT} & \textbf{Tiêu chí} & \textbf{Minh chứng} \\
+\hline
+\endfirsthead
+\hline
+\textbf{STT} & \textbf{Tiêu chí} & \textbf{Minh chứng} \\
+\hline
+\endhead
+1 & Quản lý mã nguồn GitHub & Hình~\ref{fig:git-log}, \ref{fig:github}; README hướng dẫn chạy \\ \hline
+2 & Ứng dụng + Database & Hình~\ref{fig:dashboard}--\ref{fig:users}, \ref{fig:pgadmin} \\ \hline
+3 & Nginx reverse proxy & Hình~\ref{fig:cert}, \ref{fig:hardening}; truy cập web, pgAdmin, Grafana qua Nginx \\ \hline
+4 & Prometheus + Grafana & Hình~\ref{fig:prom-targets}, \ref{fig:grafana} \\ \hline
+5 & Loki + LogQL & Bảng~\ref{tab:logql}, Hình~\ref{fig:logql-1}--\ref{fig:logql-4} \\ \hline
+6 & Hardening & Bảng~\ref{tab:hardening}, Hình~\ref{fig:hardening} \\ \hline
+7 & Tổng thể & Hình~\ref{fig:compose-ps}: 11 dịch vụ chạy bằng Docker Compose \\ \hline
+\end{longtable}
+
+\end{document}

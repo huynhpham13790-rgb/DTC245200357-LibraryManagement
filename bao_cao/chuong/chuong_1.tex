@@ -1,0 +1,74 @@
+\documentclass[../main.tex]{subfiles}
+
+\begin{document}
+
+\textit{Chương này trình bày các khái niệm và công nghệ nền tảng được sử dụng để xây dựng, triển khai và vận hành hệ thống quản lý thư viện.}
+
+\section{Container hóa với Docker và Docker Compose}
+\subsection{Docker}
+Docker là nền tảng ảo hóa ở mức hệ điều hành, cho phép đóng gói ứng dụng cùng toàn bộ thư viện phụ thuộc thành một \textit{image} và chạy dưới dạng \textit{container} cô lập~\cite{docker-docs}. Khác với máy ảo, các container dùng chung nhân Linux của máy chủ nên khởi động nhanh, tốn ít tài nguyên. Các khái niệm chính:
+\begin{itemize}
+    \item \textbf{Image:} bản mẫu chỉ đọc được xây dựng từ \texttt{Dockerfile}, gồm nhiều lớp (layer).
+    \item \textbf{Container:} một thực thể đang chạy của image, có hệ thống file, tiến trình và mạng riêng.
+    \item \textbf{Volume:} vùng lưu trữ bền vững nằm ngoài vòng đời container, dùng cho dữ liệu cơ sở dữ liệu, Grafana, Loki.
+    \item \textbf{Network:} mạng ảo (thường là \textit{bridge}) giúp các container giao tiếp với nhau qua tên dịch vụ.
+\end{itemize}
+
+\subsection{Docker Compose}
+Docker Compose cho phép mô tả một hệ thống gồm nhiều container trong một file YAML duy nhất (\texttt{docker-compose.yml}): image, biến môi trường, volume, mạng, cổng và thứ tự phụ thuộc~\cite{compose-docs}. Toàn bộ hệ thống được khởi chạy bằng một lệnh \texttt{docker compose up -d}, giúp việc triển khai lặp lại được và dễ quản lý phiên bản bằng Git.
+
+\section{Nginx và reverse proxy}
+Nginx là web server hiệu năng cao, thường được dùng làm \textit{reverse proxy} -- điểm tiếp nhận duy nhất của mọi yêu cầu từ người dùng rồi chuyển tiếp tới các dịch vụ phía sau~\cite{nginx-docs}. Việc đặt Nginx phía trước mang lại các lợi ích:
+\begin{itemize}
+    \item Chỉ một container mở cổng ra ngoài (80/443), các dịch vụ khác được ẩn trong mạng nội bộ.
+    \item Kết thúc mã hóa TLS (TLS termination) tập trung, các dịch vụ nội bộ không cần tự cấu hình HTTPS.
+    \item Định tuyến theo đường dẫn: \texttt{/} tới ứng dụng web, \texttt{/pgadmin/} tới pgAdmin, \texttt{/grafana/} tới Grafana.
+    \item Bổ sung các HTTP security header, giới hạn tần suất truy cập (rate limiting) và ghi access log thống nhất.
+\end{itemize}
+
+\textbf{HTTPS và chứng chỉ tự ký:} HTTPS dùng giao thức TLS để mã hóa dữ liệu giữa trình duyệt và máy chủ. Trong môi trường học tập, chứng chỉ được tạo bằng OpenSSL (RSA 2048 bit, hạn 365 ngày) thay vì mua từ tổ chức cấp chứng chỉ; trình duyệt sẽ cảnh báo ``Not secure'' nhưng kênh truyền vẫn được mã hóa.
+
+\section{PostgreSQL và pgAdmin}
+PostgreSQL là hệ quản trị cơ sở dữ liệu quan hệ mã nguồn mở, hỗ trợ đầy đủ giao dịch ACID, khóa dòng (\texttt{SELECT \ldots{} FOR UPDATE}), ràng buộc toàn vẹn và nhiều kiểu dữ liệu~\cite{postgres-docs}. Hệ thống dùng image \texttt{postgres:16-alpine}. pgAdmin 4 là công cụ quản trị PostgreSQL qua giao diện web, cho phép xem cấu trúc bảng, chạy câu lệnh SQL và theo dõi hoạt động của máy chủ cơ sở dữ liệu.
+
+\section{Giám sát hệ thống với Prometheus và Grafana}
+\subsection{Prometheus}
+Prometheus là hệ thống giám sát dựa trên chuỗi thời gian (time series)~\cite{prometheus-docs}. Prometheus hoạt động theo mô hình \textit{pull}: định kỳ (ở hệ thống này là 5 giây) gửi yêu cầu HTTP tới endpoint \texttt{/metrics} của các \textit{target} để thu thập số liệu, lưu lại và cho phép truy vấn bằng ngôn ngữ PromQL. Ví dụ, tốc độ request mỗi giây của Nginx được tính bằng biểu thức:
+\begin{center}\texttt{rate(nginx\_http\_requests\_total[1m])}\end{center}
+
+\subsection{Exporter}
+Exporter là thành phần trung gian chuyển số liệu của một phần mềm sang định dạng Prometheus:
+\begin{itemize}
+    \item \textbf{cAdvisor:} thu thập CPU, RAM, mạng, ổ đĩa của từng container.
+    \item \textbf{Postgres Exporter:} số kết nối, số giao dịch commit/rollback, kích thước cơ sở dữ liệu\ldots
+    \item \textbf{Nginx Exporter:} đọc trang \texttt{stub\_status} của Nginx để lấy số kết nối và số request.
+    \item \textbf{prom-client:} thư viện Node.js giúp ứng dụng tự xuất metrics (request theo route, số lần đăng nhập, số thao tác mượn/trả).
+\end{itemize}
+
+\subsection{Grafana}
+Grafana là nền tảng trực quan hóa dữ liệu, kết nối tới nhiều nguồn dữ liệu (Prometheus, Loki\ldots) và hiển thị dưới dạng dashboard~\cite{grafana-docs}. Grafana hỗ trợ \textit{provisioning} -- khai báo sẵn datasource và dashboard bằng file cấu hình, nhờ đó dashboard được quản lý trong Git và tự động xuất hiện khi khởi động hệ thống.
+
+\section{Quản lý log tập trung với Loki và Promtail}
+Loki là hệ thống lưu trữ log do Grafana Labs phát triển, được thiết kế theo triết lý ``giống Prometheus nhưng dành cho log''~\cite{loki-docs}. Thay vì đánh chỉ mục toàn văn như Elasticsearch, Loki chỉ đánh chỉ mục các \textit{nhãn} (label) nên rất nhẹ. Promtail là agent đọc file log, gắn nhãn (ví dụ \texttt{job="nginx"}) và đẩy về Loki.
+
+LogQL là ngôn ngữ truy vấn log của Loki, gồm hai phần: \textit{bộ chọn luồng log} theo nhãn và \textit{pipeline} xử lý. Ví dụ:
+\begin{itemize}
+    \item \texttt{\{job="nginx"\}}: lấy toàn bộ log của Nginx.
+    \item \texttt{\{job="nginx"\} |= "/api/borrow"}: lọc các dòng có chứa chuỗi \texttt{/api/borrow}.
+    \item \texttt{\{job="nginx"\} | json | status >= 400}: phân tích log dạng JSON rồi lọc theo trường \texttt{status}.
+    \item Đếm số log lỗi mỗi phút (metric query):\\ \texttt{sum(count\_over\_time(\{job="nginx"\} | json | status >= 400 [1m]))}
+\end{itemize}
+
+\section{Hardening -- thắt chặt bảo mật hệ thống}
+Hardening là quá trình giảm bề mặt tấn công của hệ thống bằng cách loại bỏ quyền và thành phần không cần thiết~\cite{cis-docker,owasp-top10}. Các nguyên tắc chính được áp dụng trong đề tài:
+\begin{itemize}
+    \item \textbf{Đặc quyền tối thiểu (least privilege):} container chạy bằng user thường (non-root), bỏ các Linux capability không cần thiết, bật \texttt{no-new-privileges}, hệ thống file chỉ đọc.
+    \item \textbf{Phân vùng mạng (network segmentation):} chia mạng frontend, backend, monitoring; mạng cơ sở dữ liệu không có đường ra Internet.
+    \item \textbf{Quản lý bí mật:} mật khẩu mạnh, lưu trong file \texttt{.env} không đưa lên Git.
+    \item \textbf{Bảo mật tầng ứng dụng web:} HTTPS, security header, chống SQL injection, XSS, dò mật khẩu (brute force) theo khuyến nghị OWASP.
+\end{itemize}
+
+\section{Công nghệ xây dựng ứng dụng}
+Ứng dụng quản lý thư viện được viết bằng \textbf{Node.js} với framework \textbf{Express}, kết nối PostgreSQL qua thư viện \texttt{pg}. Giao diện là ứng dụng web một trang (SPA) dùng HTML, JavaScript thuần và \textbf{Bootstrap 5}, giao tiếp với máy chủ qua REST API định dạng JSON.
+
+\end{document}
