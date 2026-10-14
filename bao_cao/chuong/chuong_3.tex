@@ -88,9 +88,11 @@ Cơ sở dữ liệu \texttt{library\_system} gồm 4 bảng, quan hệ giữa c
   \node[ent, right=1.6cm of br] (readers) {\textbf{readers}
     \nodepart{two}\underline{id} SERIAL\\name, card\_id \textit{(UNIQUE)}\\phone, email\\reader\_type\\card\_expiry\\created\_at};
   \node[ent, below=0.6cm of br] (lib) {\textbf{librarians}
-    \nodepart{two}\underline{id} SERIAL\\username \textit{(UNIQUE)}\\full\_name\\password\_hash (scrypt)\\role (admin | librarian)};
-  \draw[thick] (books.east) -- node[above, font=\scriptsize]{1 \quad\quad n} (br.west);
-  \draw[thick] (readers.west) -- node[above, font=\scriptsize]{1 \quad\quad n} (br.east);
+    \nodepart{two}\underline{id} SERIAL\\username \textit{(UNIQUE)}\\full\_name\\password\_hash (scrypt)\\role (admin | librarian)\\created\_at};
+  \draw[thick] (books.east) -- (br.west)
+    node[pos=0.12, above, font=\scriptsize]{1} node[pos=0.88, above, font=\scriptsize]{n};
+  \draw[thick] (readers.west) -- (br.east)
+    node[pos=0.12, above, font=\scriptsize]{1} node[pos=0.88, above, font=\scriptsize]{n};
 \end{tikzpicture}
 \caption{Sơ đồ quan hệ thực thể (ERD)}
 \label{fig:erd}
