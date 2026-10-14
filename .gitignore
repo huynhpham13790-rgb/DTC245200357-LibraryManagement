@@ -1,4 +1,6 @@
 node_modules/
 .env
 logs/
-.env
+nginx/ssl/*.pem
+*.odt
+*.pdf

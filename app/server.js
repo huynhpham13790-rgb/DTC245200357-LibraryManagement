@@ -3,6 +3,13 @@ const { Pool } = require('pg');
 const client = require('prom-client');
 
 const app = express();
+
+// Express 4 không tự bắt lỗi của async handler -> chuyển lỗi sang middleware xử lý lỗi
+for (const m of ['get', 'post']) {
+  const orig = app[m].bind(app);
+  app[m] = (path, ...handlers) => handlers.length === 0 ? orig(path)
+    : orig(path, ...handlers.map(h => (req, res, next) => Promise.resolve(h(req, res, next)).catch(next)));
+}
 const port = process.env.PORT || 3000;
 
 // Prometheus Metrics
@@ -29,7 +36,7 @@ app.use((req, res, next) => {
 const pool = new Pool({
   host: process.env.DB_HOST || 'postgres',
   user: process.env.DB_USER || 'libadmin',
-  password: process.env.DB_PASSWORD || '123456',
+  password: process.env.DB_PASSWORD,
   database: process.env.DB_NAME || 'library_system',
   port: 5432,
 });
@@ -112,19 +119,54 @@ app.get('/api/borrow', async (req, res) => {
 });
 app.post('/api/borrow', async (req, res) => {
   const { book_id, reader_id } = req.body;
-  await pool.query('BEGIN');
-  await pool.query('INSERT INTO borrow_records (book_id, reader_id) VALUES ($1, $2)', [book_id, reader_id]);
-  await pool.query("UPDATE books SET status = 'borrowed' WHERE id = $1", [book_id]);
-  await pool.query('COMMIT');
-  res.json({ success: true });
+  if (!book_id || !reader_id) return res.status(400).json({ error: 'Thiếu thông tin' });
+  // Dùng 1 client riêng để BEGIN/COMMIT chạy trên cùng một kết nối
+  const db = await pool.connect();
+  try {
+    await db.query('BEGIN');
+    const upd = await db.query("UPDATE books SET status = 'borrowed' WHERE id = $1 AND status = 'available'", [book_id]);
+    if (upd.rowCount === 0) {
+      await db.query('ROLLBACK');
+      return res.status(409).json({ error: 'Sách không tồn tại hoặc đang được mượn' });
+    }
+    await db.query('INSERT INTO borrow_records (book_id, reader_id) VALUES ($1, $2)', [book_id, reader_id]);
+    await db.query('COMMIT');
+    res.json({ success: true });
+  } catch (err) {
+    await db.query('ROLLBACK');
+    throw err;
+  } finally {
+    db.release();
+  }
 });
 app.post('/api/return', async (req, res) => {
-  const { record_id, book_title } = req.body;
-  await pool.query('BEGIN');
-  await pool.query("UPDATE borrow_records SET status = 'returned', return_date = CURRENT_TIMESTAMP WHERE id = $1", [record_id]);
-  await pool.query("UPDATE books SET status = 'available' WHERE title = $1", [book_title]);
-  await pool.query('COMMIT');
-  res.json({ success: true });
+  const { record_id } = req.body;
+  const db = await pool.connect();
+  try {
+    await db.query('BEGIN');
+    const rec = await db.query(
+      "UPDATE borrow_records SET status = 'returned', return_date = CURRENT_TIMESTAMP WHERE id = $1 AND status = 'borrowing' RETURNING book_id",
+      [record_id]
+    );
+    if (rec.rowCount === 0) {
+      await db.query('ROLLBACK');
+      return res.status(404).json({ error: 'Không tìm thấy phiếu mượn' });
+    }
+    await db.query("UPDATE books SET status = 'available' WHERE id = $1", [rec.rows[0].book_id]);
+    await db.query('COMMIT');
+    res.json({ success: true });
+  } catch (err) {
+    await db.query('ROLLBACK');
+    throw err;
+  } finally {
+    db.release();
+  }
+});
+
+// Bắt lỗi chung: tránh crash container khi DB lỗi
+app.use((err, req, res, next) => {
+  console.error('Request error:', req.method, req.path, err.message);
+  res.status(500).json({ error: 'Lỗi máy chủ' });
 });
 
 // Giao diện Web đầy đủ 3 chức năng
@@ -233,29 +275,33 @@ app.get('/', (req, res) => {
 
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
   <script>
+    function esc(v) {
+      return String(v ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+    }
+
     async function loadData() {
       const books = await (await fetch('/api/books')).json();
       const readers = await (await fetch('/api/readers')).json();
       const borrows = await (await fetch('/api/borrow')).json();
 
       document.getElementById('bookList').innerHTML = books.map(b => 
-        '<tr><td>' + b.id + '</td><td><b>' + b.title + '</b></td><td>' + b.author + '</td><td>' + 
+        '<tr><td>' + b.id + '</td><td><b>' + esc(b.title) + '</b></td><td>' + esc(b.author) + '</td><td>' + 
         (b.status === 'available' ? '<span class="badge bg-success">Có sẵn</span>' : '<span class="badge bg-danger">Đang mượn</span>') + '</td></tr>'
       ).join('');
 
       document.getElementById('readerList').innerHTML = readers.map(r => 
-        '<tr><td>' + r.id + '</td><td><b>' + r.name + '</b></td><td>' + r.card_id + '</td><td>' + (r.phone||'') + '</td></tr>'
+        '<tr><td>' + r.id + '</td><td><b>' + esc(r.name) + '</b></td><td>' + esc(r.card_id) + '</td><td>' + esc(r.phone) + '</td></tr>'
       ).join('');
 
       const availBooks = books.filter(b => b.status === 'available');
-      document.getElementById('borrow_book').innerHTML = availBooks.map(b => '<option value="' + b.id + '">' + b.title + '</option>').join('');
-      document.getElementById('borrow_reader').innerHTML = readers.map(r => '<option value="' + r.id + '">' + r.name + ' (' + r.card_id + ')</option>').join('');
+      document.getElementById('borrow_book').innerHTML = availBooks.map(b => '<option value="' + b.id + '">' + esc(b.title) + '</option>').join('');
+      document.getElementById('borrow_reader').innerHTML = readers.map(r => '<option value="' + r.id + '">' + esc(r.name) + ' (' + esc(r.card_id) + ')</option>').join('');
 
       document.getElementById('borrowList').innerHTML = borrows.map(br => 
-        '<tr><td>#' + br.id + '</td><td>' + br.book_title + '</td><td>' + br.reader_name + '</td><td>' + 
+        '<tr><td>#' + br.id + '</td><td>' + esc(br.book_title) + '</td><td>' + esc(br.reader_name) + '</td><td>' + 
         (br.status === 'borrowing' ? '<span class="badge bg-warning text-dark">Đang mượn</span>' : '<span class="badge bg-secondary">Đã trả</span>') + 
         '</td><td>' + 
-        (br.status === 'borrowing' ? '<button class="btn btn-sm btn-outline-success" onclick="returnBook(' + br.id + ', \\'' + br.book_title + '\\')">Trả sách</button>' : 'Đã hoàn tất') + '</td></tr>'
+        (br.status === 'borrowing' ? '<button class="btn btn-sm btn-outline-success" onclick="returnBook(' + br.id + ')">Trả sách</button>' : 'Đã hoàn tất') + '</td></tr>'
       ).join('');
     }
 
@@ -286,8 +332,8 @@ app.get('/', (req, res) => {
       loadData();
     }
 
-    async function returnBook(record_id, book_title) {
-      await fetch('/api/return', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({record_id, book_title}) });
+    async function returnBook(record_id) {
+      await fetch('/api/return', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({record_id}) });
       loadData();
     }
 
