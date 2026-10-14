@@ -49,6 +49,12 @@ services:
       DB_USER: ${DB_USER:-libadmin}
       DB_PASSWORD: ${DB_PASSWORD:?Chua dat bien trong file .env}
       DB_NAME: ${DB_NAME:-library_system}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:?Chua dat bien trong file .env}   # mật khẩu tài khoản admin đầu tiên của web
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://localhost:3000/healthz').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
     networks:
       - frontend_net
       - backend_net

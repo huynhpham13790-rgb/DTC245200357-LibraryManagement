@@ -1,0 +1,227 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>E-Library – Hệ thống Quản lý Thư viện</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
+  <link href="/style.css" rel="stylesheet">
+</head>
+<body>
+
+<!-- ============ MÀN HÌNH ĐĂNG NHẬP ============ -->
+<div id="loginView" class="login-wrap d-none">
+  <div class="login-card shadow">
+    <div class="login-brand">
+      <i class="bi bi-book-half"></i>
+      <h1>E-Library</h1>
+      <p>Hệ thống Quản lý Thư viện</p>
+    </div>
+    <form id="loginForm" class="p-4" autocomplete="on">
+      <div class="mb-3">
+        <label class="form-label">Tên đăng nhập</label>
+        <div class="input-group"><span class="input-group-text"><i class="bi bi-person"></i></span>
+          <input name="username" class="form-control" required autofocus></div>
+      </div>
+      <div class="mb-3">
+        <label class="form-label">Mật khẩu</label>
+        <div class="input-group"><span class="input-group-text"><i class="bi bi-lock"></i></span>
+          <input name="password" type="password" class="form-control" required></div>
+      </div>
+      <div id="loginError" class="alert alert-danger py-2 d-none"></div>
+      <button class="btn btn-primary w-100 py-2"><i class="bi bi-box-arrow-in-right me-1"></i> Đăng nhập</button>
+      <p class="text-muted small text-center mt-3 mb-0">Dành cho cán bộ thủ thư – Trường ĐH CNTT&amp;TT Thái Nguyên</p>
+    </form>
+  </div>
+</div>
+
+<!-- ============ ỨNG DỤNG CHÍNH ============ -->
+<div id="appView" class="d-none">
+  <aside class="sidebar">
+    <div class="brand"><i class="bi bi-book-half"></i><span>E-Library</span></div>
+    <nav class="nav flex-column" id="menu">
+      <a class="nav-link active" data-page="dashboard"><i class="bi bi-speedometer2"></i> Tổng quan</a>
+      <a class="nav-link" data-page="books"><i class="bi bi-journal-bookmark"></i> Kho sách</a>
+      <a class="nav-link" data-page="readers"><i class="bi bi-people"></i> Độc giả</a>
+      <a class="nav-link" data-page="circulation"><i class="bi bi-arrow-left-right"></i> Mượn / Trả sách</a>
+      <a class="nav-link" data-page="overdue"><i class="bi bi-exclamation-triangle"></i> Sách quá hạn <span id="overdueBadge" class="badge bg-danger ms-auto d-none"></span></a>
+      <a class="nav-link admin-only" data-page="users"><i class="bi bi-person-gear"></i> Tài khoản thủ thư</a>
+    </nav>
+    <div class="sidebar-foot small">Quy định: tối đa 5 cuốn/độc giả · hạn 14 ngày · phạt 5.000đ/ngày</div>
+  </aside>
+
+  <main class="content">
+    <header class="topbar">
+      <h2 id="pageTitle">Tổng quan</h2>
+      <div class="dropdown">
+        <button class="btn btn-light dropdown-toggle" data-bs-toggle="dropdown">
+          <i class="bi bi-person-circle me-1"></i><span id="userName"></span>
+        </button>
+        <ul class="dropdown-menu dropdown-menu-end">
+          <li><span class="dropdown-item-text small text-muted" id="userRole"></span></li>
+          <li><a class="dropdown-item" href="#" id="btnChangePw"><i class="bi bi-key me-2"></i>Đổi mật khẩu</a></li>
+          <li><hr class="dropdown-divider"></li>
+          <li><a class="dropdown-item text-danger" href="#" id="btnLogout"><i class="bi bi-box-arrow-right me-2"></i>Đăng xuất</a></li>
+        </ul>
+      </div>
+    </header>
+
+    <!-- TỔNG QUAN -->
+    <section class="page" id="page-dashboard">
+      <div class="row g-3 mb-3" id="statCards"></div>
+      <div class="row g-3">
+        <div class="col-lg-7"><div class="card h-100"><div class="card-header">Lượt mượn / trả 7 ngày gần nhất</div>
+          <div class="card-body"><div id="chartDaily" class="bar-chart"></div>
+          <div class="small text-muted mt-2"><span class="legend bg-primary"></span> Mượn <span class="legend bg-success ms-3"></span> Trả</div></div></div></div>
+        <div class="col-lg-5"><div class="card h-100"><div class="card-header">Sách được mượn nhiều nhất</div>
+          <ul class="list-group list-group-flush" id="topBooks"></ul></div></div>
+        <div class="col-12"><div class="card"><div class="card-header">Cơ cấu kho sách theo thể loại</div>
+          <div class="card-body" id="catBars"></div></div></div>
+      </div>
+    </section>
+
+    <!-- KHO SÁCH -->
+    <section class="page d-none" id="page-books">
+      <div class="toolbar">
+        <div class="input-group search"><span class="input-group-text"><i class="bi bi-search"></i></span>
+          <input id="bookSearch" class="form-control" placeholder="Tìm theo tên sách, tác giả, ISBN..."></div>
+        <select id="bookCategory" class="form-select w-auto"><option value="">Tất cả thể loại</option></select>
+        <button class="btn btn-primary ms-auto" id="btnAddBook"><i class="bi bi-plus-lg"></i> Thêm sách</button>
+      </div>
+      <div class="card"><div class="table-responsive"><table class="table table-hover align-middle mb-0">
+        <thead><tr><th>Mã</th><th>Tên sách</th><th>Tác giả</th><th>Thể loại</th><th>NXB / Năm</th><th>Vị trí</th><th class="text-center">Còn / Tổng</th><th></th></tr></thead>
+        <tbody id="bookTable"></tbody></table></div></div>
+    </section>
+
+    <!-- ĐỘC GIẢ -->
+    <section class="page d-none" id="page-readers">
+      <div class="toolbar">
+        <div class="input-group search"><span class="input-group-text"><i class="bi bi-search"></i></span>
+          <input id="readerSearch" class="form-control" placeholder="Tìm theo họ tên, mã thẻ, số điện thoại..."></div>
+        <button class="btn btn-primary ms-auto" id="btnAddReader"><i class="bi bi-person-plus"></i> Cấp thẻ độc giả</button>
+      </div>
+      <div class="card"><div class="table-responsive"><table class="table table-hover align-middle mb-0">
+        <thead><tr><th>Mã thẻ</th><th>Họ tên</th><th>Đối tượng</th><th>Liên hệ</th><th>Hạn thẻ</th><th class="text-center">Đang mượn</th><th></th></tr></thead>
+        <tbody id="readerTable"></tbody></table></div></div>
+    </section>
+
+    <!-- MƯỢN / TRẢ -->
+    <section class="page d-none" id="page-circulation">
+      <div class="row g-3">
+        <div class="col-xl-4">
+          <div class="card"><div class="card-header"><i class="bi bi-journal-plus me-1"></i> Lập phiếu mượn</div>
+            <form class="card-body" id="borrowForm">
+              <label class="form-label">Độc giả</label>
+              <select name="reader_id" id="borrowReader" class="form-select mb-1" required></select>
+              <div id="readerInfo" class="small text-muted mb-3"></div>
+              <label class="form-label">Sách (chỉ hiện sách còn bản)</label>
+              <select name="book_id" id="borrowBook" class="form-select mb-3" required></select>
+              <label class="form-label">Số ngày mượn</label>
+              <select name="days" class="form-select mb-3"><option value="7">7 ngày</option><option value="14" selected>14 ngày</option><option value="30">30 ngày</option></select>
+              <button class="btn btn-warning w-100"><i class="bi bi-check2-circle"></i> Xác nhận cho mượn</button>
+            </form>
+          </div>
+        </div>
+        <div class="col-xl-8">
+          <div class="toolbar">
+            <div class="input-group search"><span class="input-group-text"><i class="bi bi-search"></i></span>
+              <input id="loanSearch" class="form-control" placeholder="Tìm theo sách, độc giả, mã thẻ..."></div>
+            <select id="loanStatus" class="form-select w-auto">
+              <option value="borrowing">Đang mượn</option><option value="overdue">Quá hạn</option>
+              <option value="returned">Đã trả</option><option value="">Tất cả</option></select>
+          </div>
+          <div class="card"><div class="table-responsive"><table class="table table-hover align-middle mb-0">
+            <thead><tr><th>Phiếu</th><th>Sách</th><th>Độc giả</th><th>Ngày mượn</th><th>Hạn trả</th><th>Trạng thái</th><th></th></tr></thead>
+            <tbody id="loanTable"></tbody></table></div></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- QUÁ HẠN -->
+    <section class="page d-none" id="page-overdue">
+      <div class="alert alert-warning"><i class="bi bi-info-circle me-1"></i> Danh sách phiếu đã quá hạn trả. Tiền phạt tạm tính 5.000đ cho mỗi ngày trễ, được chốt khi độc giả trả sách.</div>
+      <div class="card"><div class="table-responsive"><table class="table table-hover align-middle mb-0">
+        <thead><tr><th>Phiếu</th><th>Sách</th><th>Độc giả</th><th>Hạn trả</th><th class="text-center">Số ngày trễ</th><th class="text-end">Phạt tạm tính</th><th></th></tr></thead>
+        <tbody id="overdueTable"></tbody></table></div></div>
+    </section>
+
+    <!-- TÀI KHOẢN -->
+    <section class="page d-none" id="page-users">
+      <div class="row g-3">
+        <div class="col-lg-4"><div class="card"><div class="card-header">Tạo tài khoản thủ thư</div>
+          <form class="card-body" id="userForm">
+            <input name="full_name" class="form-control mb-2" placeholder="Họ tên" required>
+            <input name="username" class="form-control mb-2" placeholder="Tên đăng nhập (a-z, 0-9)" required>
+            <input name="password" type="password" class="form-control mb-2" placeholder="Mật khẩu (≥ 10 ký tự)" minlength="10" required>
+            <select name="role" class="form-select mb-3"><option value="librarian">Thủ thư</option><option value="admin">Quản trị viên</option></select>
+            <button class="btn btn-primary w-100">Tạo tài khoản</button>
+          </form></div></div>
+        <div class="col-lg-8"><div class="card"><table class="table align-middle mb-0">
+          <thead><tr><th>Tên đăng nhập</th><th>Họ tên</th><th>Vai trò</th><th>Ngày tạo</th><th></th></tr></thead>
+          <tbody id="userTable"></tbody></table></div></div>
+      </div>
+    </section>
+  </main>
+</div>
+
+<!-- Modal sách -->
+<div class="modal fade" id="bookModal" tabindex="-1"><div class="modal-dialog modal-lg"><form class="modal-content" id="bookForm">
+  <div class="modal-header"><h5 class="modal-title" id="bookModalTitle">Thêm sách</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+  <div class="modal-body row g-3">
+    <input type="hidden" name="id">
+    <div class="col-md-8"><label class="form-label">Tên sách *</label><input name="title" class="form-control" required></div>
+    <div class="col-md-4"><label class="form-label">ISBN</label><input name="isbn" class="form-control"></div>
+    <div class="col-md-6"><label class="form-label">Tác giả *</label><input name="author" class="form-control" required></div>
+    <div class="col-md-6"><label class="form-label">Thể loại</label><input name="category" class="form-control" list="categoryList" placeholder="VD: Công nghệ thông tin"><datalist id="categoryList"></datalist></div>
+    <div class="col-md-6"><label class="form-label">Nhà xuất bản</label><input name="publisher" class="form-control"></div>
+    <div class="col-md-2"><label class="form-label">Năm XB</label><input name="publish_year" type="number" class="form-control"></div>
+    <div class="col-md-2"><label class="form-label">Vị trí kệ</label><input name="shelf" class="form-control" placeholder="A1-03"></div>
+    <div class="col-md-2"><label class="form-label">Số lượng *</label><input name="quantity" type="number" min="0" value="1" class="form-control" required></div>
+  </div>
+  <div class="modal-footer"><button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Hủy</button><button class="btn btn-primary">Lưu</button></div>
+</form></div></div>
+
+<!-- Modal độc giả -->
+<div class="modal fade" id="readerModal" tabindex="-1"><div class="modal-dialog"><form class="modal-content" id="readerForm">
+  <div class="modal-header"><h5 class="modal-title" id="readerModalTitle">Cấp thẻ độc giả</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+  <div class="modal-body row g-3">
+    <input type="hidden" name="id">
+    <div class="col-12"><label class="form-label">Họ và tên *</label><input name="name" class="form-control" required></div>
+    <div class="col-6"><label class="form-label">Mã thẻ *</label><input name="card_id" class="form-control" placeholder="DTC245200357" required></div>
+    <div class="col-6"><label class="form-label">Đối tượng</label><select name="reader_type" class="form-select"><option>Sinh viên</option><option>Giảng viên</option><option>Cán bộ</option><option>Khách</option></select></div>
+    <div class="col-6"><label class="form-label">Số điện thoại</label><input name="phone" class="form-control"></div>
+    <div class="col-6"><label class="form-label">Email</label><input name="email" type="email" class="form-control"></div>
+    <div class="col-6"><label class="form-label">Hạn thẻ</label><input name="card_expiry" type="date" class="form-control"></div>
+  </div>
+  <div class="modal-footer"><button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Hủy</button><button class="btn btn-primary">Lưu</button></div>
+</form></div></div>
+
+<!-- Modal lịch sử độc giả -->
+<div class="modal fade" id="historyModal" tabindex="-1"><div class="modal-dialog modal-lg"><div class="modal-content">
+  <div class="modal-header"><h5 class="modal-title" id="historyTitle"></h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+  <div class="modal-body p-0"><table class="table mb-0"><thead><tr><th>Phiếu</th><th>Sách</th><th>Ngày mượn</th><th>Hạn trả</th><th>Ngày trả</th><th class="text-end">Phạt</th></tr></thead><tbody id="historyTable"></tbody></table></div>
+</div></div></div>
+
+<!-- Modal đổi mật khẩu -->
+<div class="modal fade" id="pwModal" tabindex="-1"><div class="modal-dialog modal-sm"><form class="modal-content" id="pwForm">
+  <div class="modal-header"><h5 class="modal-title">Đổi mật khẩu</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+  <div class="modal-body">
+    <input name="old_password" type="password" class="form-control mb-2" placeholder="Mật khẩu hiện tại" required>
+    <input name="new_password" type="password" class="form-control" placeholder="Mật khẩu mới (≥ 10 ký tự)" minlength="10" required>
+  </div>
+  <div class="modal-footer"><button class="btn btn-primary w-100">Cập nhật</button></div>
+</form></div></div>
+
+<!-- Modal xác nhận -->
+<div class="modal fade" id="confirmModal" tabindex="-1"><div class="modal-dialog modal-sm modal-dialog-centered"><div class="modal-content">
+  <div class="modal-body" id="confirmText"></div>
+  <div class="modal-footer"><button class="btn btn-secondary" data-bs-dismiss="modal">Hủy</button><button class="btn btn-danger" id="confirmOk">Đồng ý</button></div>
+</div></div></div>
+
+<div class="toast-container position-fixed bottom-0 end-0 p-3" id="toasts"></div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+<script src="/app.js"></script>
+</body>
+</html>

@@ -1,0 +1,64 @@
+:root {
+  --sidebar-w: 250px;
+  --brand: #1e3a5f;
+  --brand-2: #274b7a;
+  --bg: #f3f5f9;
+}
+body { background: var(--bg); font-family: 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; }
+
+/* Đăng nhập */
+.login-wrap { min-height: 100vh; display: flex; align-items: center; justify-content: center;
+  background: linear-gradient(135deg, var(--brand) 0%, #3d6fa8 100%); }
+.login-card { width: 400px; max-width: calc(100% - 32px); background: #fff; border-radius: 14px; overflow: hidden; }
+.login-brand { background: var(--brand); color: #fff; text-align: center; padding: 28px 16px 20px; }
+.login-brand i { font-size: 46px; }
+.login-brand h1 { font-size: 26px; font-weight: 700; margin: 6px 0 2px; }
+.login-brand p { margin: 0; opacity: .8; }
+
+/* Khung ứng dụng */
+.sidebar { position: fixed; inset: 0 auto 0 0; width: var(--sidebar-w); background: var(--brand); color: #cfd8e6;
+  display: flex; flex-direction: column; z-index: 10; }
+.sidebar .brand { display: flex; align-items: center; gap: 10px; padding: 20px 22px; font-size: 22px; font-weight: 700; color: #fff;
+  border-bottom: 1px solid rgba(255,255,255,.1); }
+.sidebar .brand i { font-size: 28px; color: #ffc107; }
+.sidebar .nav-link { color: #cfd8e6; padding: 11px 22px; display: flex; align-items: center; gap: 12px; cursor: pointer;
+  border-left: 3px solid transparent; }
+.sidebar .nav-link:hover { background: var(--brand-2); color: #fff; }
+.sidebar .nav-link.active { background: var(--brand-2); color: #fff; border-left-color: #ffc107; font-weight: 600; }
+.sidebar-foot { margin-top: auto; padding: 16px 22px; opacity: .65; line-height: 1.5; }
+.content { margin-left: var(--sidebar-w); padding: 0 28px 28px; min-height: 100vh; }
+.topbar { display: flex; align-items: center; justify-content: space-between; padding: 18px 0; margin-bottom: 8px; }
+.topbar h2 { font-size: 22px; font-weight: 700; color: var(--brand); margin: 0; }
+
+.card { border: 0; border-radius: 10px; box-shadow: 0 1px 3px rgba(16,24,40,.08); }
+.card-header { background: #fff; font-weight: 600; color: var(--brand); border-bottom: 1px solid #edf0f5; }
+.table thead th { background: #f8fafc; color: #5b6b82; font-size: 13px; text-transform: uppercase; letter-spacing: .02em; font-weight: 600; white-space: nowrap; }
+.table td { font-size: 14.5px; }
+.toolbar { display: flex; gap: 10px; align-items: center; margin-bottom: 14px; flex-wrap: wrap; }
+.toolbar .search { max-width: 420px; }
+.btn-icon { padding: 2px 8px; }
+
+/* Thẻ thống kê */
+.stat { display: flex; align-items: center; gap: 14px; padding: 18px; }
+.stat .icon { width: 52px; height: 52px; border-radius: 12px; display: grid; place-items: center; font-size: 24px; }
+.stat .num { font-size: 26px; font-weight: 700; line-height: 1; color: #1f2937; }
+.stat .lbl { color: #6b7280; font-size: 14px; margin-top: 4px; }
+
+/* Biểu đồ cột thuần CSS */
+.bar-chart { display: flex; align-items: flex-end; gap: 14px; height: 220px; padding-top: 10px; }
+.bar-chart .day { flex: 1; display: flex; flex-direction: column; align-items: center; height: 100%; }
+.bar-chart .bars { flex: 1; display: flex; align-items: flex-end; gap: 4px; width: 100%; justify-content: center; }
+.bar-chart .bar { width: 40%; max-width: 26px; border-radius: 4px 4px 0 0; min-height: 2px; position: relative; }
+.bar-chart .bar span { position: absolute; top: -18px; left: 50%; transform: translateX(-50%); font-size: 11px; color: #555; }
+.bar-chart .lbl { font-size: 12px; color: #6b7280; margin-top: 6px; }
+.legend { display: inline-block; width: 12px; height: 12px; border-radius: 3px; vertical-align: middle; }
+.cat-row { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
+.cat-row .name { width: 200px; font-size: 14px; }
+.cat-row .progress { flex: 1; height: 14px; }
+
+@media (max-width: 900px) {
+  .sidebar { position: static; width: 100%; }
+  .sidebar .nav { flex-direction: row !important; flex-wrap: wrap; }
+  .sidebar-foot { display: none; }
+  .content { margin-left: 0; padding: 0 16px 16px; }
+}
