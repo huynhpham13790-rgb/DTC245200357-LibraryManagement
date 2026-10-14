@@ -1,0 +1,94 @@
+\documentclass[../main.tex]{subfiles}
+
+\begin{document}
+
+\renewcommand{\thefigure}{PL.\arabic{figure}}
+\setcounter{figure}{0}
+
+Phụ lục tổng hợp một số ảnh chụp màn hình trong quá trình em thực hiện triển khai hệ thống trên máy cá nhân, theo thứ tự thời gian.
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.92\textwidth]{phu-luc-01.png}
+\caption{Tạo cấu trúc thư mục dự án và các file mã nguồn ứng dụng}
+\end{figure}
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.92\textwidth]{phu-luc-02.png}
+\caption{Tạo chứng chỉ SSL tự ký bằng OpenSSL}
+\end{figure}
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.92\textwidth]{phu-luc-03.png}
+\caption{Khởi tạo Git repository và commit đầu tiên}
+\end{figure}
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.92\textwidth]{phu-luc-04.png}
+\caption{Kiểm tra cấu hình hệ thống bằng lệnh docker compose config}
+\end{figure}
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.92\textwidth]{phu-luc-05.png}
+\caption{Kiểm tra trạng thái container và đọc log Nginx khi gỡ lỗi kết nối tới pgAdmin}
+\end{figure}
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.92\textwidth]{phu-luc-06.png}
+\caption{Giao diện pgAdmin theo dõi hoạt động của PostgreSQL}
+\end{figure}
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.92\textwidth]{phu-luc-07.png}
+\caption{Log khởi động Grafana và commit tích hợp Prometheus, Grafana}
+\end{figure}
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.92\textwidth]{phu-luc-08.png}
+\caption{Kiểm tra các container và gọi thử API ứng dụng bằng curl}
+\end{figure}
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.92\textwidth]{phu-luc-09.png}
+\caption{Truy vấn log Nginx trên Grafana Explore (lần chạy đầu)}
+\end{figure}
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.92\textwidth]{phu-luc-10.png}
+\caption{Lọc log theo mã trạng thái trên Grafana Explore (lần chạy đầu)}
+\end{figure}
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.92\textwidth]{phu-luc-11.png}
+\caption{Truy vấn dạng metric từ log trên Grafana Explore}
+\end{figure}
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.92\textwidth]{phu-luc-12.png}
+\caption{Kiểm thử API và commit triển khai Loki, Promtail}
+\end{figure}
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.92\textwidth]{phu-luc-13.png}
+\caption{Giao diện phiên bản đầu tiên của ứng dụng}
+\end{figure}
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.92\textwidth]{phu-luc-14.png}
+\caption{Hoàn thiện cấu hình và đẩy mã nguồn lên GitHub}
+\end{figure}
+
+\end{document}
