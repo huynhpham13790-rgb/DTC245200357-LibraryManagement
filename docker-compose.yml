@@ -113,7 +113,10 @@ services:
     security_opt:
       - no-new-privileges:true
     environment:
-      DATA_SOURCE_NAME: "postgresql://${DB_USER:-libadmin}:${DB_PASSWORD:?Chua dat bien trong file .env}@postgres:5432/${DB_NAME:-library_system}?sslmode=disable"
+      # Tách user/pass khỏi URL để mật khẩu có ký tự đặc biệt (@, #) không làm hỏng chuỗi kết nối
+      DATA_SOURCE_URI: "postgres:5432/${DB_NAME:-library_system}?sslmode=disable"
+      DATA_SOURCE_USER: ${DB_USER:-libadmin}
+      DATA_SOURCE_PASS: ${DB_PASSWORD:?Chua dat bien trong file .env}
     networks:
       - backend_net
       - monitoring_net

@@ -3,6 +3,7 @@ const { Pool } = require('pg');
 const client = require('prom-client');
 
 const app = express();
+app.disable('x-powered-by'); // không lộ công nghệ backend
 
 // Express 4 không tự bắt lỗi của async handler -> chuyển lỗi sang middleware xử lý lỗi
 for (const m of ['get', 'post']) {
